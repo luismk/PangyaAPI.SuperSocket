@@ -6,7 +6,7 @@ using PangyaAPI.Utilities;
 using PangyaAPI.Utilities.BinaryModels;
 using PangyaAPI.IFF.Handle;
 using PangyaAPI.SuperSocket.Engine;
-using PangyaAPI.SuperSocket.StructData;
+using PangyaAPI.SuperSocket.Commom;
 using PangyaAPI.SuperSocket.Interface;
 namespace PangyaAPI.SuperSocket.SocketBase
 {
@@ -20,7 +20,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         protected readonly TAppSession NullAppSession = default(TAppSession);
         public bool IsOpen { get; set; }
-        public GenericDisposableCollection<IAppSession> Players { get; set; }
+        public AppSessionManager Players { get; set; }
         public uint NextConnectionId { get; set; } = 1;
         protected TcpListener _server { get; set; }
         public bool _isRunning { get; set; }
@@ -101,7 +101,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 m_StateCode = ServerStateConst.Initializing;
                 _isRunning = false;
                 StartedTime = DateTime.Now;
-                Players = new GenericDisposableCollection<IAppSession>();
                 ListBlockMac = new List<TableMac>();
                 m_si = new ServerInfoEx();
             }
@@ -191,7 +190,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="socketSession">The socket session.</param>
         /// <returns></returns>
-        IAppSession IServerBase.CreateAppSession(TcpClient socketSession)
+        IAppSession IServerBase.CreateAppSession(Socket socketSession)
         {
 
             var appSession = CreateAppSession(socketSession);
@@ -206,13 +205,12 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="socketSession">the socket session.</param>
         /// <returns>the new created session instance</returns>
-        protected virtual TAppSession CreateAppSession(TcpClient socketSession)
+        protected virtual TAppSession CreateAppSession(Socket socketSession)
         {
-            var appSession = new TAppSession();
+            //regeistra o novo player
+          var appSession  = Players.AddSession(socketSession, this);
 
-            appSession.Initialize(this, socketSession);
-
-            return appSession;
+            return appSession as TAppSession;
         }
 
 
@@ -222,15 +220,12 @@ namespace PangyaAPI.SuperSocket.SocketBase
             TcpClient tcpClient = (TcpClient)client;
 
             //Cria novo player
-            var player = CreateAppSession(tcpClient);
-
-            //regeistra o novo player
-            RegisterSession(NextConnectionId++.ToString(), player);
+            var player = CreateAppSession(tcpClient.Client);
 
             OnNewSessionConnected(player);
 
             //laço de repeticao para verificar se ainda esta conectado, se for true, ele fica lendo o pacote
-            while (player.Connected)
+            while (player.m_Connected)
             {
                 //lida com packet
                 var packet = HandleReceived(player);
@@ -258,7 +253,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             var AppClient = session as TAppSession;
 
-            if (!RegisterSession(AppClient.ConnectionId.ToString(), AppClient))
+            if (!RegisterSession(AppClient.m_oid.ToString(), AppClient))
                 return false;
             return true;
         }
@@ -289,7 +284,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             if (handler == null)
                 return;
 
-            if (session.Connected)
+            if (session.m_Connected)
                 handler.BeginInvoke(session, OnNewSessionConnectedCallback, handler);
         }
 
@@ -469,7 +464,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
                 if (message.Length >= 5)
                 {
-                    return new Packet(client.Key, message, false);
+                    return new Packet(client.m_key, message, false);
                 }
             }
             catch (Exception erro)
@@ -492,21 +487,24 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         private byte[] ProcessPacket(AppSession session)
         {
-            var Stream = session.Stream;
+            var socket = session.AppClient;
             try
             {
-                if (Stream != null && Stream.CanRead && session.Connected)
+                if (socket != null && socket.Available > 0 && socket.Connected)
                 {
                     var messageBufferRead = new byte[1024]; //Tamanho do BUFFER á ler
                                                             //Lê mensagem do cliente
-                    int bytesRead = Stream.Read(messageBufferRead, 0, 1024);
+                    int bytesRead = socket.Receive(messageBufferRead, messageBufferRead.Length, SocketFlags.None);
 
-                    //variável para armazenar a mensagem recebida
-                    byte[] message = new byte[bytesRead];
+                    if (bytesRead > 0)
+                    {
+                        //variável para armazenar a mensagem recebida
+                        byte[] message = new byte[bytesRead];
 
-                    //Copia mensagem recebida
-                    Buffer.BlockCopy(messageBufferRead, 0, message, 0, bytesRead);
-                    return message;
+                        //Copia mensagem recebida
+                        Buffer.BlockCopy(messageBufferRead, 0, message, 0, bytesRead);
+                        return message;
+                    }
                 }
             }
             catch

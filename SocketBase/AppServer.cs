@@ -1,8 +1,9 @@
 ﻿using PangyaAPI.IFF.Handle;
 using PangyaAPI.SuperSocket.Interface;
-using PangyaAPI.SuperSocket.StructData;
+using PangyaAPI.SuperSocket.Commom;
 using PangyaAPI.Utilities;
 using System;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
@@ -53,7 +54,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <returns></returns>
         public override TAppSession GetSessionByID(int sessionID)
         {
-            return (TAppSession)Players.Model.First(c => c.ConnectionId == sessionID);
+            return Players.FindSessionByOID((uint)sessionID) as TAppSession;
         }
 
         /// <summary>
@@ -73,17 +74,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
 
             base.OnSessionClosed(session);
-        }
-
-        public override bool RegisterSession(string sessionID, TAppSession AppClient)
-        {
-            AppClient.ConnectionId = uint.Parse(sessionID);
-            if (Players.Add(AppClient))
-                return true;
-
-              //  Logger.Error("The session is refused because the it's ID already exists!");
-
-            return false;
         }
 
         public override bool Start()

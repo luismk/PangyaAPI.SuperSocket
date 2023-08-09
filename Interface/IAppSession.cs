@@ -6,6 +6,9 @@ using System.Text;
 
 namespace PangyaAPI.SuperSocket.Interface
 {
+    /// <summary>
+    /// interface usada pelo AppSession
+    /// </summary>
     public interface IAppSession : Utilities.Interface.IDisposeable
     {
         /// <summary>
@@ -18,7 +21,7 @@ namespace PangyaAPI.SuperSocket.Interface
         /// </summary>
         IDictionary<object, object> Items { get; }
 
-        TcpClient AppClient { get; set; }
+        Socket AppClient { get; set; }
 
         /// <summary>
         /// Gets or sets the last active time of the session.
@@ -45,13 +48,13 @@ namespace PangyaAPI.SuperSocket.Interface
         /// <value>
         ///   <c>true</c> if connected; otherwise, <c>false</c>.
         /// </value>
-        bool Connected { get; set; }
+        bool m_Connected { get; set; }
 
-        byte Key { get; set; }
+        byte m_key { get; set; }
 
-        uint ConnectionId { get; set; }
+        uint m_oid { get; set; }
 
-        string Adress { get; }
+        string IP { get; }
 
         string Port { get; }
 
@@ -69,7 +72,9 @@ namespace PangyaAPI.SuperSocket.Interface
         void SendResponse(Packet packet);
         void SendResponse(byte[] message);
         void SendResponse();
-        NetworkStream Stream { get; }
+        void SendCallback(IAsyncResult result);
+        string GetNickname();
+        uint GetUID();
     }
     /// <summary>
     /// The interface for appSession
@@ -80,7 +85,7 @@ namespace PangyaAPI.SuperSocket.Interface
        where TPacket : IPacket
        where TAppSession : IAppSession, IAppSession<TAppSession, TPacket>, new()
     {
-        void Initialize(IServerBase<TAppSession, TPacket> appServer, TcpClient client);
+        void Initialize(IServerBase appServer, Socket client);
 
     }
 }

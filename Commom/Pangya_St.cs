@@ -2,7 +2,7 @@
 using System.Collections;
 using System;
 using System.Runtime.InteropServices;
-namespace PangyaAPI.SuperSocket.StructData
+namespace PangyaAPI.SuperSocket.Commom
 {
     // que guarda a estrutura de bits da propriedade do server
     public class uProperty

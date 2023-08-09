@@ -19,22 +19,17 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         public DateTime StartTime  { get; set; }
 
-        public bool Connected  { get; set; }
+        public bool m_Connected  { get; set; }
 
         public Encoding Charset { get; set; }
 
         public IDictionary<object, object> Items { get; set; }
 
-        public TcpClient AppClient { get; set; }
+        public Socket AppClient { get; set; }
         public Packet Packet { get; set; }
-        public byte Key { get ; set ; }
-        public uint ConnectionId { get ; set ; }
-       // public UserInfo UserInfo { get ; set ; }
-        public NetworkStream Stream 
-        {
-        get { return AppClient.GetStream(); }
-        }
-        NetworkStream IAppSession.Stream { get { return this.Stream; } }
+        public byte m_key { get ; set ; }
+        public uint m_oid { get ; set ; }
+
 
         /// <summary>
         /// Gets the app server instance assosiated with the session.
@@ -47,11 +42,11 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             get { return this.AppServer; }
         }
-        public string Adress
+        public string IP
         {
             get
             {
-                if (Connected)
+                if (m_Connected)
                 {
                     return RemoteEndPoint.Address.ToString();
                 }
@@ -65,7 +60,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             get
             {
-                if (Connected)
+                if (m_Connected)
                 {
                     return RemoteEndPoint.Port.ToString();
                 }
@@ -81,7 +76,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             try
             {              
-                Key = 0;
+                m_key = 0;
                 //UserInfo = new UserInfo();
             }
             catch (Exception)
@@ -108,8 +103,8 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 try
                 {
-                    AppClient.Client.Shutdown(SocketShutdown.Both);
-                    AppClient.Client.Disconnect(reuseSocket: false);
+                    AppClient.Shutdown(SocketShutdown.Both);
+                    AppClient.Disconnect(reuseSocket: false);
                     if (Packet != null)
                     {
                         Packet.Dispose();
@@ -117,7 +112,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 }
                 finally
                 {
-                    Connected = false;
+                    m_Connected = false;
                     AppClient.Close();
                 }
             }
@@ -151,10 +146,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         public virtual void Send(Packet packet)
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(packet.GetBytes, Key);
+            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(packet.GetBytes, m_key);
             try
             {
-                Stream.Write(GetBytes, 0, GetBytes.Length);
+                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
             }
             catch (Exception)
             {
@@ -165,10 +160,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
         
         public virtual void Send(byte[] message)
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(message, Key);
+            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(message, m_key);
             try
             {
-                Stream.Write(GetBytes, 0, GetBytes.Length);
+                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
             }
             catch (Exception)
             {
@@ -179,10 +174,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         public virtual void SendResponse(Packet packet)
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(packet.GetBytes, Key);
+            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(packet.GetBytes, m_key);
             try
             {
-                Stream.Write(GetBytes, 0, GetBytes.Length);
+                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
             }
             catch (Exception)
             {
@@ -193,10 +188,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
         
         public virtual void SendResponse(byte[] message)
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(message, Key);
+            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(message, m_key);
             try
             {
-                Stream.Write(GetBytes, 0, GetBytes.Length);
+                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
             }
             catch (Exception)
             {
@@ -206,10 +201,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
         }
         public virtual void Send()
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(Packet.GetBytes, Key);
+            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(Packet.GetBytes, m_key);
             try
             {
-                Stream.Write(GetBytes, 0, GetBytes.Length);
+                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
             }
             catch (Exception)
             {
@@ -219,10 +214,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
         }
         public virtual void SendResponse()
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(Packet.GetBytes, Key);
+            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(Packet.GetBytes, m_key);
             try
             {
-                Stream.Write(GetBytes, 0, GetBytes.Length);
+                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
             }
             catch (Exception)
             {
@@ -231,17 +226,35 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-        public void Initialize(IServerBase<TAppSession, TPacket> appServer, TcpClient client)
+        
+        public void Initialize(IServerBase appServer, Socket client)
         {
             var castedAppServer = (AppServerBase<TAppSession, TPacket>)appServer;
             AppServer = castedAppServer;
             AppClient = client;
             StartTime = DateTime.Now;
-            Connected = AppClient.Connected;
-            RemoteEndPoint = (IPEndPoint)AppClient.Client.RemoteEndPoint;
+            m_Connected = AppClient.Connected;
+            RemoteEndPoint = (IPEndPoint)AppClient.RemoteEndPoint;
         }
 
-        
+        public void SendCallback(IAsyncResult result)
+        {
+            try
+            {
+                var clientSocket = (Socket)result.AsyncState;
+                int bytesSent = clientSocket.EndSend(result);
+                Console.WriteLine("Sent " + bytesSent + " bytes to the server.");
+            }
+            catch (Exception ex)
+            {
+                // Handle the exception appropriately (logging, error messages, etc.)
+                Console.WriteLine("An error occurred in the send callback: " + ex.Message);
+            }
+        }
+
+        public virtual string GetNickname() { return ""; }
+
+        public virtual uint GetUID() { return 0; }
     }
     public abstract class AppSession<TAppSession> : AppSession<TAppSession, Packet>
         where TAppSession : AppSession<TAppSession, Packet>, IAppSession, new()
@@ -260,6 +273,18 @@ namespace PangyaAPI.SuperSocket.SocketBase
     /// </summary>
     public class AppSession : AppSession<AppSession>
     {
+        internal bool Clear()
+        {
+            return true;        }
 
+        internal void SetOID(uint index)
+        {
+            m_oid = index;
+        }
+
+        internal void SetTimeStartAndTick(int tickCount)
+        {
+         //   throw new NotImplementedException();
+        }
     }
 }

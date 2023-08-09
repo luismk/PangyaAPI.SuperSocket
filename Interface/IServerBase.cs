@@ -24,7 +24,7 @@ namespace PangyaAPI.SuperSocket.Interface
         /// </summary>
         /// <param name="socketSession">The socket session.</param>
         /// <returns></returns>
-        IAppSession CreateAppSession(TcpClient socketSession);
+        IAppSession CreateAppSession(Socket socketSession);
 
         /// <summary>
         /// Registers the new created app session into the appserver's session container.
