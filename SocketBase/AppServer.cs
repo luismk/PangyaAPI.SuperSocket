@@ -1,17 +1,18 @@
 ﻿using PangyaAPI.IFF.Handle;
 using PangyaAPI.SuperSocket.Interface;
-using PangyaAPI.SuperSocket.Commom;
+using PangyaAPI.Player.Data;
 using PangyaAPI.Utilities;
 using System;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
+using _smp = PangyaAPI.Utilities.Log;
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
     public abstract class AppServer<TAppSession, TPacket> : AppServerBase<TAppSession, TPacket>
-        where TPacket : class, IPacket
+        where TPacket : class, IRequest
         where TAppSession : AppSession<TAppSession, TPacket>, IAppSession, new()
     {
 
@@ -68,8 +69,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 if (!Players.Remove(session))
                 {
-                    //if (Logger.IsErrorEnabled)
-                    //    Logger.Error(session, "Failed to remove this session, Because it has't been in session container!");
+                    if (Logger.IsErrorEnabled)
+                        Logger.Error(session, "Failed to remove this session, Because it has't been in session container!");
+                    _smp.Message_Pool.push("[Server.OnStarted][Log]: Server starting...", _smp.type_msg.CL_FILE_LOG_AND_CONSOLE);
                 }
             }
 

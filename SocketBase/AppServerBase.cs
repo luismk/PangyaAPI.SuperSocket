@@ -6,30 +6,30 @@ using PangyaAPI.Utilities;
 using PangyaAPI.Utilities.BinaryModels;
 using PangyaAPI.IFF.Handle;
 using PangyaAPI.SuperSocket.Engine;
-using PangyaAPI.SuperSocket.Commom;
+using PangyaAPI.Player.Data;
 using PangyaAPI.SuperSocket.Interface;
+using PangyaAPI.Utilities.Log;
+using System.Text;
+using System.Threading;
+
 namespace PangyaAPI.SuperSocket.SocketBase
 {
-    public abstract partial class AppServerBase<TAppSession, TPacket> : IServerBase<TAppSession, TPacket>
-        where TPacket : class, IPacket
-        where TAppSession : AppSession<TAppSession, TPacket>, IAppSession, new()
+    public abstract partial class AppServerBase<TAppSession, TRequestInfo> : IAppServer<TAppSession, TRequestInfo>, IRawDataProcessor<TAppSession>
+        where TRequestInfo : class, IRequestInfo
+        where TAppSession : AppSession<TAppSession, TRequestInfo>, IAppSession, new()
     {
-        #region Fields
         /// <summary>
         /// Null appSession instance
         /// </summary>
         protected readonly TAppSession NullAppSession = default(TAppSession);
-        public bool IsOpen { get; set; }
-        public AppSessionManager Players { get; set; }
-        public uint NextConnectionId { get; set; } = 1;
-        protected TcpListener _server { get; set; }
-        public bool _isRunning { get; set; }
-        public IFFHandle IFF { get; set; }
-        public bool IFFLog { get; set; }
-        public IniHandle Ini { get; set; }
-        public ServerInfoEx m_si { get; set; }
-        public List<TableMac> ListBlockMac { get; set; }
-        public DateTime StartedTime { get; }
+
+        /// <summary>
+        /// Gets the server's config.
+        /// </summary>
+        public IServerConfig Config { get; private set; }
+
+        //Server instance name
+        private string m_Name;
 
         /// <summary>
         /// the current state's code
@@ -50,148 +50,295 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-        //Server instance name
-        public string Name
-        {
-            get
-            {
-                return m_si.Name;
-            }
-        }
-        #endregion
-
-        #region Events
-
-        public event RequestHandler<TAppSession, TPacket> NewRequestReceived;
-
-
-        private SessionHandler<TAppSession> m_SessionClosed;
-
         /// <summary>
-        /// Gets/sets the session closed event handler.
+        /// Gets or sets the receive filter factory.
         /// </summary>
-        public event SessionHandler<TAppSession> SessionClosed
-        {
-            add { m_SessionClosed += value; }
-            remove { m_SessionClosed -= value; }
-        }
-
-        private SessionHandler<TAppSession> m_NewSessionConnected;
+        /// <value>
+        /// The receive filter factory.
+        /// </value>
+        public virtual IReceiveFilterFactory<TRequestInfo> ReceiveFilterFactory { get; protected set; }
 
         /// <summary>
-        /// The action which will be executed after a new session connect
+        /// Gets the Receive filter factory.
         /// </summary>
-        public event SessionHandler<TAppSession> NewSessionConnected
+        object IAppServer.ReceiveFilterFactory
         {
-            add { m_NewSessionConnected += value; }
-            remove { m_NewSessionConnected -= value; }
+            get { return this.ReceiveFilterFactory; }
         }
 
-        #endregion
+        private static bool m_ThreadPoolConfigured = false;
 
-        #region Construtor
+        private long m_TotalHandledRequests = 0;
+
         /// <summary>
-        /// construtura
+        /// Gets the total handled requests number.
+        /// </summary>
+        protected long TotalHandledRequests
+        {
+            get { return m_TotalHandledRequests; }
+        }
+
+        /// <summary>
+        /// Gets the started time of this server instance.
+        /// </summary>
+        /// <value>
+        /// The started time.
+        /// </value>
+        public DateTime StartedTime { get; private set; }
+
+        /// <summary>
+        /// Gets the default text encoding.
+        /// </summary>
+        /// <value>
+        /// The text encoding.
+        /// </value>
+        public Encoding TextEncoding { get; private set; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AppServerBase&lt;TAppSession, TRequestInfo&gt;"/> class.
         /// </summary>
         public AppServerBase()
         {
-            try
-            {
-                //Inicia Servidor
-                m_StateCode = ServerStateConst.Initializing;
-                _isRunning = false;
-                StartedTime = DateTime.Now;
-                ListBlockMac = new List<TableMac>();
-                m_si = new ServerInfoEx();
-            }
-            catch (Exception erro)
-            {
-                Console.WriteLine(DateTime.Now.ToString() + $" Erro ao iniciar o servidor: {erro.Message}");
-                Console.ReadKey();
-                Environment.Exit(0);
-            }
+
         }
-        #endregion
 
         /// <summary>
-        /// Called when [session closed].
+        /// Initializes a new instance of the <see cref="AppServerBase&lt;TAppSession, TRequestInfo&gt;"/> class.
         /// </summary>
-        /// <param name="session">The AppClient.</param>
-        /// <param name="reason">The reason.</param>
-        protected virtual void OnSessionClosed(TAppSession session)
+        /// <param name="receiveFilterFactory">The Receive filter factory.</param>
+        public AppServerBase(IReceiveFilterFactory<TRequestInfo> receiveFilterFactory)
         {
-            var handler = m_SessionClosed;
-
-            if (handler != null)
-            {
-                handler.BeginInvoke(session, OnSessionClosedCallback, handler);
-            }
-
-            session.OnSessionClosed();
+            this.ReceiveFilterFactory = receiveFilterFactory;
         }
 
-        private void OnSessionClosedCallback(IAsyncResult result)
+        private IPAddress ParseIPAddress(string ip)
         {
+            if (string.IsNullOrEmpty(ip) || "Any".Equals(ip, StringComparison.OrdinalIgnoreCase))
+                return IPAddress.Any;
+            else if ("IPv6Any".Equals(ip, StringComparison.OrdinalIgnoreCase))
+                return IPAddress.IPv6Any;
+            else
+                return IPAddress.Parse(ip);
+        }
+
+        /// <summary>
+        /// Setups the listeners base on server configuration
+        /// </summary>
+        /// <param name="config">The config.</param>
+        /// <returns></returns>
+        private bool SetupListeners(IServerConfig config)
+        {
+            var listeners = new List<ListenerInfo>();
+
             try
             {
-                var handler = (SessionHandler<TAppSession>)result.AsyncState;
-                handler.EndInvoke(result);
+               
+                return true;
             }
             catch (Exception e)
             {
-                //Logger.Error(e);
+                //if (Logger.IsErrorEnabled)
+                //    //Logger.Error(e);
+
+                return false;
             }
         }
 
         /// <summary>
-        /// Gets all sessions in sessions snapshot.
+        /// Gets the name of the server instance.
         /// </summary>
-        public virtual List<TAppSession> GetAllSessions()
+        public string Name
         {
-            throw new NotSupportedException();
+            get { return m_Name; }
+        }
+        /// <summary>
+        /// Starts this server instance.
+        /// </summary>
+        /// <returns>
+        /// return true if start successfull, else false
+        /// </returns>
+        public virtual bool Start()
+        {
+            var origStateCode = Interlocked.CompareExchange(ref m_StateCode, ServerStateConst.Starting, ServerStateConst.NotStarted);
+
+            if (origStateCode != ServerStateConst.NotStarted)
+            {
+                if (origStateCode < ServerStateConst.NotStarted)
+                    throw new Exception("You cannot start a server instance which has not been setup yet.");
+
+                //if (Logger.IsErrorEnabled)
+                //    //Logger.ErrorFormat("This server instance is in the state {0}, you cannot start it now.", (ServerState)origStateCode);
+
+                return false;
+            }
+            //inicia
+
+            //if (!m_SocketServer.Start())
+            //{
+            //    m_StateCode = ServerStateConst.NotStarted;
+            //    return false;
+            //}
+
+            StartedTime = DateTime.Now;
+            m_StateCode = ServerStateConst.Running;
+
+            try
+            {
+                //Will be removed in the next version
+#pragma warning disable 0612, 618
+                OnStartup();
+#pragma warning restore 0612, 618
+
+                OnStarted();
+            }
+            catch (Exception e)
+            {
+                //if (Logger.IsErrorEnabled)
+                //{
+                //    //Logger.Error("One exception wa thrown in the method 'OnStartup()'.", e);
+                //}
+            }
+            finally
+            {
+                //if (Logger.IsInfoEnabled)
+                //    Logger.Info(string.Format("The server instance {0} has been started!", Name));
+            }
+
+            return true;
         }
 
         /// <summary>
-        /// Gets the app session by ID.
+        /// Called when [startup].
         /// </summary>
-        /// <param name="sessionID"></param>
+        [Obsolete("Use OnStarted() instead")]
+        protected virtual void OnStartup()
+        {
+
+        }
+
+        /// <summary>
+        /// Called when [started].
+        /// </summary>
+        protected virtual void OnStarted()
+        {
+
+        }
+
+        /// <summary>
+        /// Called when [stopped].
+        /// </summary>
+        protected virtual void OnStopped()
+        {
+
+        }
+
+        /// <summary>
+        /// Stops this server instance.
+        /// </summary>
+        public virtual void Stop()
+        {
+            if (Interlocked.CompareExchange(ref m_StateCode, ServerStateConst.Stopping, ServerStateConst.Running)
+                    != ServerStateConst.Running)
+            {
+                return;
+            }
+            //tcp 
+            //m_SocketServer.Stop();
+
+            m_StateCode = ServerStateConst.NotStarted;
+
+            OnStopped();
+
+          
+        }
+
+        private Func<TAppSession, byte[], int, int, bool> m_RawDataReceivedHandler;
+
+        /// <summary>
+        /// Gets or sets the raw binary data received event handler.
+        /// TAppSession: session
+        /// byte[]: receive buffer
+        /// int: receive buffer offset
+        /// int: receive lenght
+        /// bool: whether process the received data further
+        /// </summary>
+        event Func<TAppSession, byte[], int, int, bool> IRawDataProcessor<TAppSession>.RawDataReceived
+        {
+            add { m_RawDataReceivedHandler += value; }
+            remove { m_RawDataReceivedHandler -= value; }
+        }
+
+        /// <summary>
+        /// Called when [raw data received].
+        /// </summary>
+        /// <param name="session">The session.</param>
+        /// <param name="buffer">The buffer.</param>
+        /// <param name="offset">The offset.</param>
+        /// <param name="length">The length.</param>
+        internal bool OnRawDataReceived(IAppSession session, byte[] buffer, int offset, int length)
+        {
+            var handler = m_RawDataReceivedHandler;
+            if (handler == null)
+                return true;
+
+            return handler((TAppSession)session, buffer, offset, length);
+        }
+
+        private RequestHandler<TAppSession, TRequestInfo> m_RequestHandler;
+
+        /// <summary>
+        /// Occurs when a full request item received.
+        /// </summary>
+        public virtual event RequestHandler<TAppSession, TRequestInfo> NewRequestReceived
+        {
+            add { m_RequestHandler += value; }
+            remove { m_RequestHandler -= value; }
+        }
+
+        /// <summary>
+        /// Executes the command for the session.
+        /// </summary>
+        /// <param name="session">The session.</param>
+        /// <param name="requestInfo">The request info.</param>
+        internal void ExecuteCommand(IAppSession session, TRequestInfo requestInfo)
+        {
+            this.ExecuteCommand((TAppSession)session, requestInfo);
+        }
+
+      
+        /// <summary>
+        /// Executes the connection filters.
+        /// </summary>
+        /// <param name="remoteAddress">The remote address.</param>
         /// <returns></returns>
-        IAppSession IServerBase.GetSessionByID(int sessionID)
-        {
-            return this.GetSessionByID(sessionID);
-        }
+        //private bool ExecuteConnectionFilters(IPEndPoint remoteAddress)
+        //{
+        //    if (m_ConnectionFilters == null)
+        //        return true;
 
-        IAppSession IServerBase.GetSessionByNick(string Nick)
-        {
-            return this.GetSessionByNick(Nick);
-        }
+        //    for (var i = 0; i < m_ConnectionFilters.Count; i++)
+        //    {
+        //        var currentFilter = m_ConnectionFilters[i];
+        //        if (!currentFilter.AllowConnect(remoteAddress))
+        //        {
+        //            if (Logger.IsInfoEnabled)
+        //                Logger.InfoFormat("A connection from {0} has been refused by filter {1}!", remoteAddress, currentFilter.Name);
+        //            return false;
+        //        }
+        //    }
 
-        IAppSession IServerBase.GetSessionByUserName(string User)
-        {
-            return this.GetSessionByUserName(User);
-        }
-
-        /// <summary>
-        /// Gets the matched sessions from sessions snapshot.
-        /// </summary>
-        /// <param name="critera">The prediction critera.</param>
-        public virtual IEnumerable<TAppSession> GetSessions(Func<TAppSession, bool> critera)
-        {
-            throw new NotSupportedException();
-        }
-
-        /// <summary>
-        /// Gets the total session count.
-        /// </summary>
-        public abstract int SessionCount { get; }
+        //    return true;
+        //}
 
         /// <summary>
         /// Creates the app session.
         /// </summary>
         /// <param name="socketSession">The socket session.</param>
         /// <returns></returns>
-        IAppSession IServerBase.CreateAppSession(Socket socketSession)
+        IAppSession IAppServer.CreateAppSession(ISocketSession socketSession)
         {
+            //if (!ExecuteConnectionFilters(socketSession.RemoteEndPoint))
+            //    return NullAppSession;
 
             var appSession = CreateAppSession(socketSession);
 
@@ -205,43 +352,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="socketSession">the socket session.</param>
         /// <returns>the new created session instance</returns>
-        protected virtual TAppSession CreateAppSession(Socket socketSession)
+        protected virtual TAppSession CreateAppSession(ISocketSession socketSession)
         {
-            //regeistra o novo player
-          var appSession  = Players.AddSession(socketSession, this);
-
-            return appSession as TAppSession;
-        }
-
-
-        public void HandleClient(object client)
-        {
-            //Recebe cliente a partir do parâmetro
-            TcpClient tcpClient = (TcpClient)client;
-
-            //Cria novo player
-            var player = CreateAppSession(tcpClient.Client);
-
-            OnNewSessionConnected(player);
-
-            //laço de repeticao para verificar se ainda esta conectado, se for true, ele fica lendo o pacote
-            while (player.m_Connected)
-            {
-                //lida com packet
-                var packet = HandleReceived(player);
-                if (packet.Message != null)
-                {
-                    //request 
-                    NewRequestReceived?.Invoke(player, packet as TPacket);
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            //desconecta caso for false
-            OnSessionClosed(player);
+            return new TAppSession();
         }
 
         /// <summary>
@@ -249,12 +362,16 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="session">The session.</param>
         /// <returns></returns>
-        bool IServerBase.RegisterSession(IAppSession session)
+        bool IAppServer.RegisterSession(IAppSession session)
         {
-            var AppClient = session as TAppSession;
+            var appSession = session as TAppSession;
 
-            if (!RegisterSession(AppClient.m_oid.ToString(), AppClient))
+            if (!RegisterSession(appSession.m_oid, appSession))
                 return false;
+
+            appSession.SocketSession.Closed += OnSocketSessionClosed;
+
+            OnNewSessionConnected(appSession);
             return true;
         }
 
@@ -262,18 +379,25 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// Registers the session into session container.
         /// </summary>
         /// <param name="sessionID">The session ID.</param>
-        /// <param name="AppClient">The app session.</param>
+        /// <param name="appSession">The app session.</param>
         /// <returns></returns>
-        public virtual bool RegisterSession(string sessionID, TAppSession AppClient)
-        {  //Define no player qual servidor ele está
-            AppClient.AppServer = this;
+        protected virtual bool RegisterSession(uint sessionID, TAppSession appSession)
+        {
             return true;
         }
 
-        public void OnNewSessionDisconnect(TAppSession session)
+
+        private SessionHandler<TAppSession> m_NewSessionConnected;
+
+        /// <summary>
+        /// The action which will be executed after a new session connect
+        /// </summary>
+        public event SessionHandler<TAppSession> NewSessionConnected
         {
-            OnSessionClosed(session);
+            add { m_NewSessionConnected += value; }
+            remove { m_NewSessionConnected -= value; }
         }
+
         /// <summary>
         /// Called when [new session connected].
         /// </summary>
@@ -284,8 +408,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             if (handler == null)
                 return;
 
-            if (session.m_Connected)
-                handler.BeginInvoke(session, OnNewSessionConnectedCallback, handler);
+            handler.BeginInvoke(session, OnNewSessionConnectedCallback, handler);
         }
 
         private void OnNewSessionConnectedCallback(IAsyncResult result)
@@ -297,264 +420,115 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
             catch (Exception e)
             {
-                // Logger.Error(e);
+                //Logger.Error(e);
             }
         }
 
-
-        public virtual bool Start()
+        /// <summary>
+        /// Called when [socket session closed].
+        /// </summary>
+        /// <param name="session">The socket session.</param>
+        /// <param name="reason">The reason.</param>
+        private void OnSocketSessionClosed(ISocketSession session, CloseReason reason)
         {
-            if (m_StateCode == ServerStateConst.Initializing)
+            //Even if LogBasicSessionActivity is false, we also log the unexpected closing because the close reason probably be useful
+          
+
+            var appSession = session.AppSession as TAppSession;
+            appSession.Connected = false;
+            OnSessionClosed(appSession, reason);
+        }
+
+        private SessionHandler<TAppSession, CloseReason> m_SessionClosed;
+        /// <summary>
+        /// Gets/sets the session closed event handler.
+        /// </summary>
+        public event SessionHandler<TAppSession, CloseReason> SessionClosed
+        {
+            add { m_SessionClosed += value; }
+            remove { m_SessionClosed -= value; }
+        }
+
+        /// <summary>
+        /// Called when [session closed].
+        /// </summary>
+        /// <param name="session">The appSession.</param>
+        /// <param name="reason">The reason.</param>
+        protected virtual void OnSessionClosed(TAppSession session, CloseReason reason)
+        {
+            var handler = m_SessionClosed;
+
+            if (handler != null)
             {
-                _server = new TcpListener(IPAddress.Parse(m_si.IP), m_si.Port);
-
-                _server.Start(m_si.MaxUser);
-
-                if (_server != null)
-                {
-                    //Abre servidor para os jogadores
-                    IsOpen = true;
-                    _isRunning = true;
-
-                    m_StateCode = ServerStateConst.Running;
-                    WriteConsole.WriteLine($"[SERVER_START]: PORT => {m_si.Port}", ConsoleColor.Green);
-
-
-
-                    if (IFFLog)
-                        IFF.Log();
-
-                    return true;
-                }
+                handler.BeginInvoke(session, reason, OnSessionClosedCallback, handler);
             }
-            if (m_StateCode == ServerStateConst.Running && _isRunning)
-            {
-                return false;
-            }
-            else
-            {
-                Console.WriteLine("Failed to start!");
-                Console.ReadKey();
-                m_StateCode = ServerStateConst.NotStarted;
-                IsOpen = false;
-                _isRunning = false;
-                return false;
-            }
+
+            session.OnSessionClosed(reason);
         }
 
-        public bool Stop()
-        {
-            if (m_StateCode == ServerStateConst.Running && _isRunning)
-            {
-                if (_server != null)
-                {
-                    //fecha servidor para os jogadores
-                    IsOpen = false;
-                    _isRunning = false;
-
-                    m_StateCode = ServerStateConst.Stopping;
-                    WriteConsole.WriteLine($"[SERVER_STOP]: STATUS => {m_si.Port}:{ServerStateConst.Stopping.ToString().ToUpper()}", ConsoleColor.Green);
-                    return true;
-                }
-            }
-            Console.WriteLine("Failed to stop!");
-            Console.ReadKey();
-            m_StateCode = ServerStateConst.NotStarted;
-            IsOpen = false;
-            _isRunning = false;
-            return false;
-        }
-
-        public bool Reset()
-        {
-            if (m_StateCode == ServerStateConst.Running && _isRunning)
-            {
-                if (_server != null)
-                {
-
-                    //fecha servidor para os jogadores
-                    IsOpen = false;
-                    _isRunning = false;
-
-                    m_StateCode = ServerStateConst.NotStarted;
-                    WriteConsole.WriteLine($"[SERVER_RESETED]: STATUS => {m_si.Port}:{50001}", ConsoleColor.Green);
-                    return true;
-                }
-            }
-            Console.WriteLine("Failed to stop!");
-            Console.ReadKey();
-            m_StateCode = ServerStateConst.NotStarted;
-            IsOpen = false;
-            _isRunning = false;
-            return false;
-        }
-
-        public void Send(IAppSession session, Packet packet)
-        {
-            session.Send(packet);
-        }
-
-        public void Send(IAppSession session, byte[] packet)
-        {
-            session.Send(packet);
-        }
-        public void SendToAll(Packet packet)
-        {
-            foreach (var session in Players.Model)
-            {
-                session.Send(packet);
-            }
-        }
-
-        public void SendToAll(byte[] packet)
-        {
-            foreach (var session in Players.Model)
-            {
-                session.Send(packet);
-            }
-        }
-        #region Comandos no console
-        public void ServerMessage(string message)
-        {
-            var response = new PangyaBinaryWriter();
-
-            response.Write(new byte[] { 0x43, 0x00 });
-            response.WritePStr(message);
-
-            SendToAll(response.GetBytes());
-
-            Console.WriteLine("Mensagem enviada com sucesso");
-        }
-
-
-        public void TickerMessage(string message)
-        {
-            var response = new PangyaBinaryWriter();
-
-            response.Write(new byte[] { 0xC9, 0x00 });
-            response.WritePStr("@Admin");
-            response.WritePStr(message);
-            response.WriteZero(1);
-
-            SendToAll(response.GetBytes());
-
-            Console.WriteLine("Ticker enviado com sucesso");
-        }
-
-
-
-
-        public void BroadMessage(string message)
-        {
-            var response = new PangyaBinaryWriter();
-
-            response.Write(new byte[] { 0x42, 0x00 });
-            response.WritePStr("Aviso: " + message);
-
-            SendToAll(response.GetBytes());
-            Console.WriteLine("BroadCast enviado com sucesso");
-        }
-        #endregion
-
-        public Packet HandleReceived(IAppSession client)
+        private void OnSessionClosedCallback(IAsyncResult result)
         {
             try
             {
-                var message = ProcessPacket(client as AppSession);
-
-                if (message.Length >= 5)
-                {
-                    return new Packet(client.m_key, message, false);
-                }
+                var handler = (SessionHandler<TAppSession, CloseReason>)result.AsyncState;
+                handler.EndInvoke(result);
             }
-            catch (Exception erro)
+            catch (Exception e)
             {
-                //System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace(erro, true);
-
-                //Console.WriteLine("[Exception] " + erro.Message);
-
-                //Console.WriteLine(trace.GetFrame(0).GetMethod().ReflectedType.FullName);
-                //Console.WriteLine("Method: " + erro.TargetSite);
-                //Console.WriteLine("Line: " + trace.GetFrame(0).GetFileLineNumber());
-                //Console.WriteLine("Column: " + trace.GetFrame(0).GetFileColumnNumber());
-
-                // Logger.Error(erro);
-
+                ////Logger.Error(e);
             }
-            //Sem Resposta
-            return new Packet();
         }
 
-        private byte[] ProcessPacket(AppSession session)
-        {
-            var socket = session.AppClient;
-            try
-            {
-                if (socket != null && socket.Available > 0 && socket.Connected)
-                {
-                    var messageBufferRead = new byte[1024]; //Tamanho do BUFFER á ler
-                                                            //Lê mensagem do cliente
-                    int bytesRead = socket.Receive(messageBufferRead, messageBufferRead.Length, SocketFlags.None);
-
-                    if (bytesRead > 0)
-                    {
-                        //variável para armazenar a mensagem recebida
-                        byte[] message = new byte[bytesRead];
-
-                        //Copia mensagem recebida
-                        Buffer.BlockCopy(messageBufferRead, 0, message, 0, bytesRead);
-                        return message;
-                    }
-                }
-            }
-            catch
-            {
-                return new byte[0];
-            }
-            return new byte[0];
-        }
-
-
-        public bool haveBanList(string _ip_address, string _mac_address, bool _check_mac = true)
-        {
-            if (_check_mac)
-            {
-                // Verifica primeiro se o MAC Address foi bloqueado
-
-                // Cliente não enviou um MAC Address válido, bloquea essa conexão que é hacker que mudou o ProjectG
-                if (string.IsNullOrEmpty(_mac_address))
-                    return true;    // Cliente não enviou um MAC Address válido, bloquea essa conexão que é hacker que mudou o ProjectG
-
-                foreach (var item in ListBlockMac)
-                {
-                    if (string.IsNullOrEmpty(item.Mac_Adress) == false && item.Mac_Adress == _mac_address)
-                    {
-
-                    }
-                    return true;	// MAC Address foi bloqueado
-                }
-            }
-            // IP Address inválido, bloquea essa conexão que é Hacker ou Bug
-
-            if (string.IsNullOrEmpty(_ip_address))
-                return true;
-
-            return false;
-
-        }
-
-
-        #region Methods Abstracts
         /// <summary>
         /// Gets the app session by ID.
         /// </summary>
         /// <param name="sessionID">The session ID.</param>
         /// <returns></returns>
-        public abstract TAppSession GetSessionByID(int sessionID);
-        public abstract IAppSession GetSessionByNick(string Nick);
+        public abstract TAppSession GetSessionByID(string sessionID);
 
-        public abstract IAppSession GetSessionByUserName(string User);
+        /// <summary>
+        /// Gets the app session by ID.
+        /// </summary>
+        /// <param name="sessionID"></param>
+        /// <returns></returns>
+        IAppSession IAppServer.GetSessionByID(int sessionID)
+        {
+            return this.GetSessionByID(sessionID.ToString());
+        }
 
-        #endregion fim
+        /// <summary>
+        /// Gets the matched sessions from sessions snapshot.
+        /// </summary>
+        /// <param name="critera">The prediction critera.</param>
+        public virtual IEnumerable<TAppSession> GetSessions(Func<TAppSession, bool> critera)
+        {
+            throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Gets all sessions in sessions snapshot.
+        /// </summary>
+        public virtual IEnumerable<TAppSession> GetAllSessions()
+        {
+            throw new NotSupportedException();
+        }
+
+        /// <summary>
+        /// Gets the total session count.
+        /// </summary>
+        public abstract int SessionCount { get; }
+
+        #region IDisposable Members
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources
+        /// </summary>
+        public void Dispose()
+        {
+            if (m_StateCode == ServerStateConst.Running)
+                Stop();
+        }
+
+        #endregion
     }
 }

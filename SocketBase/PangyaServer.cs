@@ -1,4 +1,4 @@
-﻿using PangyaAPI.SuperSocket.Commom;
+﻿using PangyaAPI.Player.Data;
 using PangyaAPI.SuperSocket.Interface;
 using PangyaAPI.Utilities;
 using System;

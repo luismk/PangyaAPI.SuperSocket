@@ -36,9 +36,6 @@
     <Reference Include="System.Configuration" />
     <Reference Include="System.Configuration.Install" />
     <Reference Include="System.Core" />
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.4.1, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>packages\System.Runtime.CompilerServices.Unsafe.4.5.3\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
-    </Reference>
     <Reference Include="System.Runtime.Remoting" />
     <Reference Include="System.ServiceProcess" />
     <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
@@ -61,16 +58,23 @@
     <Compile Include="Interface\ICharacterInfo.cs" />
     <Compile Include="Interface\IFindItem.cs" />
     <Compile Include="Interface\IItemDataManager.cs" />
+    <Compile Include="Interface\IListenerConfig.cs" />
     <Compile Include="Interface\IPacket.cs" />
-    <Compile Include="Interface\IServerBase.cs" />
+    <Compile Include="Interface\IAppServer.cs" />
+    <Compile Include="Interface\IRequestInfo.cs" />
+    <Compile Include="Interface\IServerConfig.cs" />
     <Compile Include="Interface\IServerPacket.cs" />
+    <Compile Include="Interface\ISessionBase.cs" />
+    <Compile Include="Interface\ISocketSession.cs" />
     <Compile Include="Interface\ITransactionItem.cs" />
     <Compile Include="Interface\IWarehouseItem.cs" />
+    <Compile Include="Interface\SocketMode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SocketBase\AppServer.cs" />
     <Compile Include="SocketBase\AppServerBase.cs" />
     <Compile Include="SocketBase\AppSession.cs" />
     <Compile Include="SocketBase\AppSessionManager.cs" />
+    <Compile Include="SocketBase\Logger.cs" />
     <Compile Include="SocketBase\Packet.cs" />
     <Compile Include="SocketBase\PacketBase.cs" />
     <Compile Include="SocketBase\PangyaServer.cs" />
@@ -85,17 +89,18 @@
       <Project>{fe8119de-c23f-4d81-934a-da8926104eb3}</Project>
       <Name>PangyaAPI.IFF</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\..\source\repos\PangyaAPI\PangyaAPI.Utilities\PangyaAPI.Utilities.csproj">
-      <Project>{1e2be994-1794-47ce-b66b-65f02d42570c}</Project>
-      <Name>PangyaAPI.Utilities</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\..\..\source\repos\PangyaAPI\PangyaAPI.ZIP\PangyaAPI.ZIP.csproj">
       <Project>{71f94c7f-94e8-4aeb-963f-248fd4ee4e92}</Project>
       <Name>PangyaAPI.ZIP</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
+    <ProjectReference Include="..\PangyaAPI.Player\PangyaAPI.Player.csproj">
+      <Project>{a507f3e5-c9b8-4e57-b360-0f868dc21e22}</Project>
+      <Name>PangyaAPI.Player</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\PangyaAPI.Utilities\PangyaAPI.Utilities.csproj">
+      <Project>{1e2be994-1794-47ce-b66b-65f02d42570c}</Project>
+      <Name>PangyaAPI.Utilities</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -7,13 +7,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.SuperSocket", "Pa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.IFF", "..\..\..\..\source\repos\PangyaAPI\PangyaAPI.IFF\PangyaAPI.IFF.csproj", "{FE8119DE-C23F-4D81-934A-DA8926104EB3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.Utilities", "..\..\..\..\source\repos\PangyaAPI\PangyaAPI.Utilities\PangyaAPI.Utilities.csproj", "{1E2BE994-1794-47CE-B66B-65F02D42570C}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.ZIP", "..\..\..\..\source\repos\PangyaAPI\PangyaAPI.ZIP\PangyaAPI.ZIP.csproj", "{71F94C7F-94E8-4AEB-963F-248FD4EE4E92}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.Cryptor", "..\..\..\..\source\repos\PangyaAPI\PangyaAPI.Cryptor\PangyaAPI.Cryptor.csproj", "{BCCD991F-699A-4915-B533-074BABCD3DEC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestServer", "TestServer\ServerConsole.csproj", "{1735E72C-871D-47E5-945A-097599AB7724}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerConsole", "TestServer\ServerConsole.csproj", "{1735E72C-871D-47E5-945A-097599AB7724}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.Utilities", "..\PangyaAPI.Utilities\PangyaAPI.Utilities.csproj", "{1E2BE994-1794-47CE-B66B-65F02D42570C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PangyaAPI.Player", "..\PangyaAPI.Player\PangyaAPI.Player.csproj", "{A507F3E5-C9B8-4E57-B360-0F868DC21E22}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,10 +31,6 @@ Global
 		{FE8119DE-C23F-4D81-934A-DA8926104EB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE8119DE-C23F-4D81-934A-DA8926104EB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE8119DE-C23F-4D81-934A-DA8926104EB3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{71F94C7F-94E8-4AEB-963F-248FD4EE4E92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{71F94C7F-94E8-4AEB-963F-248FD4EE4E92}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{71F94C7F-94E8-4AEB-963F-248FD4EE4E92}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -45,6 +43,14 @@ Global
 		{1735E72C-871D-47E5-945A-097599AB7724}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1735E72C-871D-47E5-945A-097599AB7724}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1735E72C-871D-47E5-945A-097599AB7724}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E2BE994-1794-47CE-B66B-65F02D42570C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A507F3E5-C9B8-4E57-B360-0F868DC21E22}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A507F3E5-C9B8-4E57-B360-0F868DC21E22}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A507F3E5-C9B8-4E57-B360-0F868DC21E22}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A507F3E5-C9B8-4E57-B360-0F868DC21E22}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

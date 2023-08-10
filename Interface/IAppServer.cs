@@ -1,5 +1,6 @@
 ﻿using PangyaAPI.SuperSocket.Engine;
 using PangyaAPI.SuperSocket.SocketBase;
+using PangyaAPI.Utilities.Log;
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
@@ -9,7 +10,7 @@ namespace PangyaAPI.SuperSocket.Interface
     /// <summary>
     /// interface do servidor,criado por LuisMK
     /// </summary>
-    public interface IServerBase
+    public interface IAppServer
     {
         /// <summary>
         /// Gets the started time.
@@ -24,8 +25,12 @@ namespace PangyaAPI.SuperSocket.Interface
         /// </summary>
         /// <param name="socketSession">The socket session.</param>
         /// <returns></returns>
-        IAppSession CreateAppSession(Socket socketSession);
-
+        /// <summary>
+        /// Creates the app session.
+        /// </summary>
+        /// <param name="socketSession">The socket session.</param>
+        /// <returns></returns>
+        IAppSession CreateAppSession(ISocketSession socketSession);
         /// <summary>
         /// Registers the new created app session into the appserver's session container.
         /// </summary>
@@ -48,6 +53,8 @@ namespace PangyaAPI.SuperSocket.Interface
 
         bool Stop();
         bool Reset();
+
+        Logger Logger { get; set; }
         /// <summary>
         /// cria e lida com player
         /// </summary>
@@ -67,12 +74,17 @@ namespace PangyaAPI.SuperSocket.Interface
         void BroadMessage(string message);
         void TickerMessage(string message);
         void ServerMessage(string message);
+
+        /// <summary>
+        /// Gets the Receive filter factory.
+        /// </summary>
+        object ReceiveFilterFactory { get; }
     }
     /// <summary>
     /// The interface for AppServer
     /// </summary>
     /// <typeparam name="TAppSession">The type of the app session.</typeparam>
-    public interface IServerBase<TAppSession> : IServerBase
+    public interface IAppServer<TAppSession> : IAppServer
        where TAppSession : IAppSession
     {
         /// <summary>
@@ -102,14 +114,59 @@ namespace PangyaAPI.SuperSocket.Interface
     /// </summary>
     /// <typeparam name="TAppSession">The type of the app session.</typeparam>
     /// <typeparam name="TRequestInfo">The type of the request info.</typeparam>
-    public interface IServerBase<TAppSession, TPacket> : IServerBase<TAppSession>
-        where TPacket : IPacket
-        where TAppSession : IAppSession, IAppSession<TAppSession, TPacket>, new()
+    public interface IAppServer<TAppSession, TRequestInfo> : IAppServer<TAppSession>
+         where TRequestInfo : IRequestInfo
+         where TAppSession : IAppSession, IAppSession<TAppSession, TRequestInfo>, new()
     {
         /// <summary>
         /// Occurs when [request comming].
         /// </summary>
-        event RequestHandler<TAppSession, TPacket> NewRequestReceived;
+        event RequestHandler<TAppSession, TRequestInfo> NewRequestReceived;
+    }
+    /// <summary>
+    /// The raw data processor
+    /// </summary>
+    /// <typeparam name="TAppSession">The type of the app session.</typeparam>
+    public interface IRawDataProcessor<TAppSession>
+        where TAppSession : IAppSession
+    {
+        /// <summary>
+        /// Gets or sets the raw binary data received event handler.
+        /// TAppSession: session
+        /// byte[]: receive buffer
+        /// int: receive buffer offset
+        /// int: receive lenght
+        /// bool: whether process the received data further
+        /// </summary>
+        event Func<TAppSession, byte[], int, int, bool> RawDataReceived;
     }
 
+    /// <summary>
+    /// The interface for handler of session request
+    /// </summary>
+    /// <typeparam name="TRequestInfo">The type of the request info.</typeparam>
+    public interface IRequestHandler<TRequestInfo>
+        where TRequestInfo : IRequestInfo
+    {
+        /// <summary>
+        /// Executes the command.
+        /// </summary>
+        /// <param name="session">The session.</param>
+        /// <param name="requestInfo">The request info.</param>
+        void ExecuteCommand(IAppSession session, TRequestInfo requestInfo);
+    }
+
+    /// <summary>
+    /// SocketServer Accessor interface
+    /// </summary>
+    public interface ISocketServerAccessor
+    {
+        /// <summary>
+        /// Gets the socket server.
+        /// </summary>
+        /// <value>
+        /// The socket server.
+        /// </value>
+        ISocketServer SocketServer { get; }
+    }
 }

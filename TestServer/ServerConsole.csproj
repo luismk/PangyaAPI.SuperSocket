@@ -54,10 +54,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\..\source\repos\PangyaAPI\PangyaAPI.Utilities\PangyaAPI.Utilities.csproj">
-      <Project>{1E2BE994-1794-47CE-B66B-65F02D42570C}</Project>
-      <Name>PangyaAPI.Utilities</Name>
-    </ProjectReference>
     <ProjectReference Include="..\PangyaAPI.SuperSocket.csproj">
       <Project>{db6a8db2-c62c-4838-b4ff-e9b1884433b4}</Project>
       <Name>PangyaAPI.SuperSocket</Name>

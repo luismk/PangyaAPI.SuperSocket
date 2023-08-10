@@ -48,7 +48,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-        public AppSession AddSession(Socket sock, IServerBase server)
+        public AppSession AddSession(Socket sock, IAppServer server)
         {
             if (sock == null || server == null)
                 throw new Exception("[session_manager::addSession][ERR_SESSION] _sock is invalid.");
@@ -105,7 +105,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             for (int i = 0; i < Count; ++i)
             {
-                if (Model[i].AppClient == null)
+                if (Model[i].SocketSession == null)
                 {
                     return Convert.ToUInt32(i);
                 }
@@ -134,7 +134,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 _session = (AppSession)Model.FirstOrDefault(el =>
                 {
-                    return el.AppClient != null &&
+                    return el.SocketSession != null &&
                            el.m_oid == _oid;
                 });
             }
@@ -148,7 +148,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 _session = (AppSession)Model.FirstOrDefault(el =>
                 {
-                    return el.AppClient != null &&
+                    return el.SocketSession != null &&
                            el.GetUID() == _uid;
                 });
             }
@@ -162,7 +162,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 v_s = Model.Where(el =>
                 {
-                    return el.AppClient != null &&
+                    return el.SocketSession != null &&
                            el.GetUID() == _uid;
                 }).ToList();
             }
@@ -176,7 +176,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 s = (AppSession)Model.FirstOrDefault(el =>
                 {
-                    return el.AppClient != null &&
+                    return el.SocketSession != null &&
                            string.Equals(el.GetNickname(), _nickname);
                 });
             }
@@ -189,7 +189,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 ret = Model.Count(session =>
                 {
-                    return session.AppClient != null;
+                    return session.SocketSession != null;
                 }) == Model.Count;
             }
             return ret;

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 namespace PangyaAPI.SuperSocket.Interface
 {
-    public interface IPacket
+    public interface IRequest
     {
         /// <summary>
         /// Mensagem do Packet
@@ -133,7 +133,7 @@ namespace PangyaAPI.SuperSocket.Interface
         #endregion
     }
 
-    public interface IPacket<TPacket> : IPacket
+    public interface IPacket<TPacket> : IRequest
     {
     }
 

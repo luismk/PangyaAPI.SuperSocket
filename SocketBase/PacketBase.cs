@@ -9,7 +9,7 @@ using System.Text;
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
-    public class AppPacketBase : IPacket, IDisposable
+    public class AppPacketBase : IRequest, IDisposable
     {
         private MemoryStream _stream;
         private PangyaBinaryReader Reader;
