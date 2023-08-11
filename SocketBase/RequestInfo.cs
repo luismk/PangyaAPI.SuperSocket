@@ -46,6 +46,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// Gets the body.
         /// </summary>
         public TRequestBody Body { get; private set; }
+        public byte[] Message { get; set; }
     }
 
     /// <summary>

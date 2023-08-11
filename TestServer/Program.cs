@@ -1,4 +1,5 @@
-﻿using PangyaAPI.SuperSocket.SocketBase;
+﻿using PangyaAPI.SuperSocket.Interface;
+using PangyaAPI.SuperSocket.SocketBase;
 using ServerConsole.Server;
 using ServerConsole.Session;
 using System;
@@ -11,7 +12,7 @@ namespace ServerConsole
         {
             var serverApp = new MainServer();//chama a class com servidor imbutido
 
-            serverApp.Setup();//inicializa o server
+            serverApp.StartingServer();//inicializa o server
             serverApp.NewSessionConnected += Handle_NewSessionConnected;
             serverApp.NewRequestReceived += Handle_NewRequestReceived;
             //faz um laço para o servidor fica sempre correndo
@@ -32,6 +33,7 @@ namespace ServerConsole
 
             }
         }
+
         /// <summary>
         /// metodo que ira lidar com conexao do player recebida
         /// </summary>
@@ -48,7 +50,7 @@ namespace ServerConsole
         /// <param name="session">Jogador ou conexao</param>
         /// <param name="requestInfo">mensgem ou packet</param>
         /// <exception cref="NotImplementedException">@! não implementado(ainda)</exception>
-        private static void Handle_NewRequestReceived(Player session, Packet requestInfo)
+        private static void Handle_NewRequestReceived(Player session, IRequestInfo requestInfo)
         {
             throw new NotImplementedException();
         }

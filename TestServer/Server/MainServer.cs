@@ -1,4 +1,5 @@
-﻿using PangyaAPI.SuperSocket.SocketBase;
+﻿using PangyaAPI.SuperSocket.Interface;
+using PangyaAPI.SuperSocket.SocketBase;
 using ServerConsole.Session;
 
 namespace ServerConsole.Server
@@ -7,7 +8,12 @@ namespace ServerConsole.Server
     /// Vai ser a class usada no Program.cs
     /// </summary>
     public class MainServer : PangyaServer<Player>
+
     {
+        public MainServer()
+        {
+        }
+
         //public override PangyaAPI.SuperSocket.Interface.IAppSession GetSessionByNick(string Nick)
         //{
         //    throw new System.NotImplementedException();
@@ -20,6 +26,7 @@ namespace ServerConsole.Server
 
         protected override void SendKeyOnConnect(Player session)
         {
+            throw new System.NotImplementedException();
         }
     }
 }

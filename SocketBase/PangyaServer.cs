@@ -9,12 +9,10 @@ using System.Threading.Tasks;
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
-    public abstract class PangyaServer<T> : AppServer<T, Packet>
-        where T : AppSession<T, Packet>, IAppSession, new()
+
+    public abstract partial class PangyaServer<T> : AppServer<T, IRequestInfo>
+     where T : AppSession<T, IRequestInfo>, IAppSession, new()
     {
-        #region
-        protected abstract void SendKeyOnConnect(T session);
-        #endregion
         public PangyaServer()
         {
             try
@@ -32,29 +30,28 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 WriteConsole.Error(ex.Message);
             }
         }
-
-        protected PangyaServer(string servername)
-          : base()
+        private void ProcessNewMessage(T session, IRequestInfo requestInfo)
         {
-
+           var requestNew = requestInfo as PangyaPacketReceive;
         }
+
         public bool StartingServer()
         {
 
             try
             {
-                var result = Start();
-
+                var result = Setup(m_si.IP, m_si.Port);
+                if (result == false)
+                {
+                    Console.WriteLine("Failed to Setup!");
+                    Console.ReadKey();
+                }
+                result = Start();
                 if (result == false)
                 {
                     Console.WriteLine("Failed to start!");
                     Console.ReadKey();
                 }
-                if (result)
-                {
-
-                }
-
                 return result;
             }
             catch (Exception ex)
@@ -82,35 +79,25 @@ namespace PangyaAPI.SuperSocket.SocketBase
             };
             //IFFLog = Ini.ReadBool("SERVERINFO", "IFFLog", false);
 
-            Players = new AppSessionManager(m_si.MaxUser);
+            //Players = new AppSessionManager(m_si.MaxUser);
 
-        }
-        private void ProcessNewMessage(T session, Packet requestinfo)
-        {
-            session.Packet = requestinfo;
         }
 
         protected override void OnNewSessionConnected(T session)
         {
             SendKeyOnConnect(session);
-            if (session.m_Connected)
+            if (session.Connected)
             {
-                WriteConsole.WriteLine($"[PLAYER_CONNETED]: ID => {session.m_oid}, Connection => {session?.IP}:{session?.Port}", ConsoleColor.Green);
+                WriteConsole.WriteLine($"[PLAYER_CONNETED]: ID => {session.m_oid}, Connection => {session?.GetAdress}", ConsoleColor.Green);
             }
             m_si.Curr_User = SessionCount;
         }
 
-        protected override void OnSessionClosed(T session)
+        protected override void OnSessionClosed(T session, CloseReason reason = CloseReason.ClientClosing)
         {
-            base.OnSessionClosed(session);
-            WriteConsole.WriteLine($"[PLAYER_DISCONNETED]: ID => {session?.m_oid}, Connection => {session?.IP}:{session?.Port}", ConsoleColor.Red);
+            base.OnSessionClosed(session, reason);
+            WriteConsole.WriteLine($"[PLAYER_DISCONNETED]: ID => {session?.m_oid}, Connection => {session?.GetAdress}", ConsoleColor.Red);
             m_si.Curr_User = SessionCount;
         }
-
-        public void NewSessionClosed(T session)
-        {
-            OnSessionClosed(session);
-        }
-
     }
 }

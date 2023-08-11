@@ -1,13 +1,9 @@
-﻿using PangyaAPI.IFF.Handle;
-using PangyaAPI.SuperSocket.Interface;
+﻿using PangyaAPI.SuperSocket.Interface;
 using PangyaAPI.Player.Data;
 using PangyaAPI.Utilities;
 using System;
-using System.IO;
 using System.Linq;
-using System.Net.Sockets;
 using System.Threading;
-using _smp = PangyaAPI.Utilities.Log;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -17,7 +13,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
     /// <summary>
     /// AppServer class
     /// </summary>
-    public class AppServer : AppServer<AppSession>
+    public abstract partial class AppServer : AppServer<AppSession>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="AppServer"/> class.
@@ -43,7 +39,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
     /// AppServer class
     /// </summary>
     /// <typeparam name="TAppSession">The type of the app session.</typeparam>
-    public class AppServer<TAppSession> : AppServer<TAppSession, StringRequestInfo>
+    public abstract partial class AppServer<TAppSession> : AppServer<TAppSession, StringRequestInfo>
         where TAppSession : AppSession<TAppSession, StringRequestInfo>, IAppSession, new()
     {
         /// <summary>
@@ -72,7 +68,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
     /// </summary>
     /// <typeparam name="TAppSession">The type of the app session.</typeparam>
     /// <typeparam name="TRequestInfo">The type of the request info.</typeparam>
-    public abstract class AppServer<TAppSession, TRequestInfo> : AppServerBase<TAppSession, TRequestInfo>
+    public abstract partial class AppServer<TAppSession, TRequestInfo> : AppServerBase<TAppSession, TRequestInfo>
         where TRequestInfo : class, IRequestInfo
         where TAppSession : AppSession<TAppSession, TRequestInfo>, IAppSession, new()
     {
@@ -82,9 +78,25 @@ namespace PangyaAPI.SuperSocket.SocketBase
         public AppServer()
             : base()
         {
+            //IFF = new IFFHandle("data//pangya_jp.iff");
+            Ini = new IniHandle("Config//Server.ini");
+            m_si = new ServerInfoEx();
+        }
+
+      public AppServer(string ServerName)
+           : base()
+        {
 
         }
 
+        #region
+        protected abstract void SendKeyOnConnect(TAppSession session);
+        #endregion
+
+        public bool LoadingFiles()
+        {
+            return true;
+        }
         /// <summary>
         /// Initializes a new instance of the <see cref="AppServer&lt;TAppSession, TRequestInfo&gt;"/> class.
         /// </summary>

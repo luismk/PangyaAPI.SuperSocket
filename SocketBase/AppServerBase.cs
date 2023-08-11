@@ -2,14 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Net.Security;
 using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+using PangyaAPI.Player.Data;
 using PangyaAPI.SuperSocket.Engine;
 using PangyaAPI.SuperSocket.Interface;
+using PangyaAPI.Utilities;
 namespace PangyaAPI.SuperSocket.SocketBase
 {
     /// <summary>
@@ -53,10 +52,11 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-        /// <summary>
-        /// Gets the certificate of current server.
-        /// </summary>
-        public X509Certificate Certificate { get; private set; }
+       // public IFFHandle IFF { get; set; }
+        public bool IFFLog { get; set; }
+        public IniHandle Ini { get; set; }
+        public ServerInfoEx m_si { get; set; }
+        public List<TableMac> ListBlockMac { get; set; }
 
         /// <summary>
         /// Gets or sets the receive filter factory.
@@ -135,6 +135,20 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         public AppServerBase()
         {
+            try
+            {
+                //Inicia Servidor
+                m_StateCode = ServerStateConst.Initializing;
+                StartedTime = DateTime.Now;
+                ListBlockMac = new List<TableMac>();
+                m_si = new ServerInfoEx();
+            }
+            catch (Exception erro)
+            {
+                Console.WriteLine(DateTime.Now.ToString() + $" Erro ao iniciar o servidor: {erro.Message}");
+                Console.ReadKey();
+                Environment.Exit(0);
+            }
 
         }
 
@@ -697,6 +711,38 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             this.ExecuteCommand((TAppSession)session, requestInfo);
         }
+
+
+
+        /// <summary>
+        /// Executes the command.
+        /// </summary>
+        /// <param name="session">The session.</param>
+        /// <param name="requestInfo">The request info.</param>
+        protected virtual void ExecuteCommand(TAppSession session, TRequestInfo requestInfo)
+        {
+            if (m_RequestHandler != null)
+            {
+                try
+                {
+                    //chama novos pacotes/call new packets
+                    m_RequestHandler(session, requestInfo);
+                }
+                catch (Exception e)
+                {
+                    session.InternalHandleExcetion(e);
+                }
+
+                session.LastActiveTime = DateTime.Now;
+                Interlocked.Increment(ref m_TotalHandledRequests);
+            }
+            else
+            {
+                session.LastActiveTime = DateTime.Now;
+                session.InternalHandleUnknownRequest(requestInfo);
+            }
+        }
+
 
         /// <summary>
         /// Executes the command.

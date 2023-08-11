@@ -9,6 +9,8 @@
         /// Gets the connectionID of this request.
         /// </summary>
         uint m_oid { get; }
+
+        byte[] Message { get; set; }
     }
 
     /// <summary>

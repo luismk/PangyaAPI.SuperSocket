@@ -20,7 +20,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         public byte[] GetRemainingData => this.Reader.GetRemainingData();
 
-        public byte[] GetBytes => this.Writer.GetBytes();
+        public byte[] GetBytes => this.Writer.GetBytes;
         public short Id { get; set; }
         private bool disposedValue = false;
         public AppPacketBase()

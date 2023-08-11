@@ -1,5 +1,8 @@
-﻿using PangyaAPI.SuperSocket.Engine;
+﻿using PangyaAPI.Player.Data;
+using PangyaAPI.SuperSocket.Engine;
 using PangyaAPI.SuperSocket.SocketBase;
+using PangyaAPI.Utilities;
+using System.Collections.Generic;
 
 namespace PangyaAPI.SuperSocket.Interface
 {
@@ -37,6 +40,11 @@ namespace PangyaAPI.SuperSocket.Interface
         /// Gets the total session count.
         /// </summary>
         int SessionCount { get; }
+        // public IFFHandle IFF { get; set; }
+        //bool IFFLog { get; set; }
+        //IniHandle Ini { get; set; }
+        //ServerInfoEx m_si { get; set; }
+        //List<TableMac> ListBlockMac { get; set; }
     }
 
 
