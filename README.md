@@ -1,5 +1,6 @@
 # Pangya Super Socket Server API
 
+[Special Version]
 
 remaking the mechanisms of the pangya !
 
@@ -14,16 +15,19 @@ https://github.com/eantoniobr/UGPangya/PangyaAPI.TcpServer
 
 ### Installation
 download the api and start working
-First Version:
+
+First Version API:
 
 https://github.com/luismk/PangyaAPI.SuperSocket/tree/c70438cf9f929af2ee6aaf50bc62ee13ef21a518
 
 has been tested in beta phases!
 
-New Version not Tested
-there may be miscellaneous glitches, updating for the future!
+New Version Tested
 
+there may be miscellaneous glitches, updating for the future!
 
 ### Authors
 * **Eric Antonio** - *PangyaSuperSocket is the brainchild of* - [Pangya Unogames](https://github.com/eantoniobr)
 * **Luis MK** - *implementer of the idea* - [Pangya GameRaze](https://github.com/luismk)
+
+  
