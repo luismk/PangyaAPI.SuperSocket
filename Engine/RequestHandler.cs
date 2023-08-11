@@ -11,5 +11,5 @@ namespace PangyaAPI.SuperSocket.Engine
     /// <param name="requestInfo">The request info.</param>
     public delegate void RequestHandler<TAppSession, TRequestInfo>(TAppSession session, TRequestInfo requestInfo)
         where TAppSession : IAppSession, IAppSession<TAppSession, TRequestInfo>, new()
-        where TRequestInfo : IRequest;
+        where TRequestInfo : IRequestInfo;
 }

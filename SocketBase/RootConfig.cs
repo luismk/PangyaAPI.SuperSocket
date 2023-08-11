@@ -2,7 +2,7 @@
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
-    public interface IReceiveFilter<TRequestInfo> where TRequestInfo : class, IRequestInfo
+    internal class RootConfig : IRootConfig
     {
     }
 }

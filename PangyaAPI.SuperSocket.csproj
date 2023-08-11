@@ -50,35 +50,79 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Engine\IAsyncSocketEventComplete.cs" />
+    <Compile Include="Engine\NewClientAcceptHandler.cs" />
     <Compile Include="Engine\RequestHandler.cs" />
+    <Compile Include="Engine\SendingQueue.cs" />
     <Compile Include="Engine\ServerStatus.cs" />
     <Compile Include="Engine\SessionHandle.cs" />
+    <Compile Include="Engine\SocketServerBase.cs" />
+    <Compile Include="Ext\ConfigurationExtension.cs" />
+    <Compile Include="Ext\Tools.cs" />
     <Compile Include="Interface\IAppSession.cs" />
+    <Compile Include="Interface\IBootstrap.cs" />
     <Compile Include="Interface\ICaddieInfo.cs" />
     <Compile Include="Interface\ICharacterInfo.cs" />
+    <Compile Include="Interface\ICommandLoader.cs" />
+    <Compile Include="Interface\IConnectionFilter.cs" />
     <Compile Include="Interface\IFindItem.cs" />
     <Compile Include="Interface\IItemDataManager.cs" />
     <Compile Include="Interface\IListenerConfig.cs" />
+    <Compile Include="Interface\ILogFactory.cs" />
     <Compile Include="Interface\IPacket.cs" />
     <Compile Include="Interface\IAppServer.cs" />
+    <Compile Include="Interface\IPoolInfo.cs" />
+    <Compile Include="Interface\IReceiveFilterFactory.cs" />
+    <Compile Include="Interface\IReceiveFilterInitializer.cs" />
     <Compile Include="Interface\IRequestInfo.cs" />
+    <Compile Include="Interface\IRootConfig.cs" />
     <Compile Include="Interface\IServerConfig.cs" />
     <Compile Include="Interface\IServerPacket.cs" />
     <Compile Include="Interface\ISessionBase.cs" />
+    <Compile Include="Interface\ISmartPoolSource.cs" />
+    <Compile Include="Interface\ISocketServer.cs" />
+    <Compile Include="Interface\ISocketServerFactory.cs" />
     <Compile Include="Interface\ISocketSession.cs" />
     <Compile Include="Interface\ITransactionItem.cs" />
     <Compile Include="Interface\IWarehouseItem.cs" />
     <Compile Include="Interface\SocketMode.cs" />
+    <Compile Include="Ext\AssemblyUtil.cs" />
+    <Compile Include="Engine\IActiveConnector.cs" />
+    <Compile Include="Engine\ISocketListener.cs" />
+    <Compile Include="PangyaAPI\SuperSocket\Interface\IPool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SocketBase\ActiveConnectResult.cs" />
     <Compile Include="SocketBase\AppServer.cs" />
     <Compile Include="SocketBase\AppServerBase.cs" />
     <Compile Include="SocketBase\AppSession.cs" />
     <Compile Include="SocketBase\AppSessionManager.cs" />
+    <Compile Include="Engine\AsyncSocketServer.cs" />
+    <Compile Include="Engine\AsyncSocketSession.cs" />
+    <Compile Include="Engine\AsyncStreamSocketSession.cs" />
+    <Compile Include="SocketBase\CommandUpdateEventArgs.cs" />
+    <Compile Include="SocketBase\CommandUpdateInfo.cs" />
+    <Compile Include="SocketBase\ExportFactory.cs" />
+    <Compile Include="SocketBase\FilterState.cs" />
+    <Compile Include="Interface\IOffsetAdapter.cs" />
+    <Compile Include="Interface\IReceiveFilter.cs" />
+    <Compile Include="SocketBase\ListenerConfig.cs" />
+    <Compile Include="SocketBase\ListenerInfo.cs" />
     <Compile Include="SocketBase\Logger.cs" />
     <Compile Include="SocketBase\Packet.cs" />
     <Compile Include="SocketBase\PacketBase.cs" />
     <Compile Include="SocketBase\PangyaServer.cs" />
     <Compile Include="Commom\Pangya_St.cs" />
+    <Compile Include="SocketBase\ProviderFactoryInfo.cs" />
+    <Compile Include="SocketBase\ProviderKey.cs" />
+    <Compile Include="SocketBase\RequestInfo.cs" />
+    <Compile Include="SocketBase\RootConfig.cs" />
+    <Compile Include="SocketBase\ServerConfig.cs" />
+    <Compile Include="SocketBase\SmartPool.cs" />
+    <Compile Include="SocketBase\SocketServerFactory.cs" />
+    <Compile Include="SocketBase\StatusInfoCollection.cs" />
+    <Compile Include="SocketBase\StatusInfoKeys.cs" />
+    <Compile Include="SocketBase\StringRequestInfo.cs" />
+    <Compile Include="Engine\TcpSocketServerBase.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\source\repos\PangyaAPI\PangyaAPI.Cryptor\PangyaAPI.Cryptor.csproj">
@@ -102,5 +146,6 @@
       <Name>PangyaAPI.Utilities</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

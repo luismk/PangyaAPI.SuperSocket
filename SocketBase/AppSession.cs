@@ -1,22 +1,65 @@
-﻿using PangyaAPI.SuperSocket.Interface;
-using System;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Text;
 using System.Threading;
-
+using PangyaAPI.SuperSocket.Interface;
 namespace PangyaAPI.SuperSocket.SocketBase
 {
-    public abstract partial class AppSession<TAppSession, TPacket> : IAppSession, IAppSession<TAppSession, TPacket>
-        where TAppSession : AppSession<TAppSession, TPacket>, IAppSession, new()
-        where TPacket : class, IPacket
+    /// <summary>
+    /// AppSession base class
+    /// </summary>
+    /// <typeparam name="TAppSession">The type of the app session.</typeparam>
+    /// <typeparam name="TRequestInfo">The type of the request info.</typeparam>
+    public abstract class AppSession<TAppSession, TRequestInfo> : IAppSession, IAppSession<TAppSession, TRequestInfo>
+        where TAppSession : AppSession<TAppSession, TRequestInfo>, IAppSession, new()
+        where TRequestInfo : class, IRequestInfo
     {
+        #region Properties
         public bool Disposed { get; set; }
 
-        public DateTime LastActiveTime { get; set; }
+        /// <summary>
+        /// Gets the app server instance assosiated with the session.
+        /// </summary>
+        public virtual AppServerBase<TAppSession, TRequestInfo> AppServer { get; private set; }
 
-        public DateTime StartTime  { get; set; }
+        /// <summary>
+        /// Gets the app server instance assosiated with the session.
+        /// </summary>
+        IAppServer IAppSession.AppServer
+        {
+            get { return this.AppServer; }
+        }
+
+        /// <summary>
+        /// Gets or sets the charset which is used for transfering text message.
+        /// </summary>
+        /// <value>
+        /// The charset.
+        /// </value>
+        public Encoding Charset { get; set; }
+
+        private IDictionary<object, object> m_Items;
+
+        /// <summary>
+        /// Gets the items dictionary, only support 10 items maximum
+        /// </summary>
+        public IDictionary<object, object> Items
+        {
+            get
+            {
+                if (m_Items == null)
+                    m_Items = new Dictionary<object, object>(10);
+
+                return m_Items;
+            }
+        }
+
+
         private bool m_Connected = false;
 
         /// <summary>
@@ -30,35 +73,16 @@ namespace PangyaAPI.SuperSocket.SocketBase
             get { return m_Connected; }
             internal set { m_Connected = value; }
         }
-        public Encoding Charset { get; set; }
 
-        public IDictionary<object, object> Items { get; set; }
-
-        public Socket AppClient { get; set; }
-        public Packet Packet { get; set; }
-        public byte m_key { get ; set ; }
-        public uint m_oid { get ; set ; }
-
-
-        /// <summary>
-        /// Gets the app server instance assosiated with the session.
-        /// </summary>
-        public virtual AppServerBase<TAppSession, TPacket> AppServer { get; set; }
-        /// <summary>
-        /// Gets the app server instance assosiated with the session.
-        /// </summary>
-        IAppServer IAppSession.AppServer
-        {
-            get { return this.AppServer; }
-        }
-
+        public byte m_key { get; set; }
+        public uint m_oid { get; set; }
         public string GetAdress
         {
             get
             {
                 if (Connected)
                 {
-                    return RemoteEndPoint.Port.ToString()+ ":" + RemoteEndPoint.Address.ToString();
+                    return RemoteEndPoint.Port.ToString() + ":" + RemoteEndPoint.Address.ToString();
                 }
                 else
                 {
@@ -67,6 +91,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
+
         /// <summary>
         /// Gets the local listening endpoint.
         /// </summary>
@@ -74,6 +99,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             get { return SocketSession.LocalEndPoint; }
         }
+
         /// <summary>
         /// Gets the remote endpoint of client.
         /// </summary>
@@ -81,6 +107,19 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             get { return SocketSession.RemoteEndPoint; }
         }
+
+        /// <summary>
+        /// Gets or sets the last active time of the session.
+        /// </summary>
+        /// <value>
+        /// The last active time.
+        /// </value>
+        public DateTime LastActiveTime { get; set; }
+
+        /// <summary>
+        /// Gets the start time of the session.
+        /// </summary>
+        public DateTime StartTime { get; private set; }
 
         /// <summary>
         /// Gets the socket session of the AppSession.
@@ -95,52 +134,118 @@ namespace PangyaAPI.SuperSocket.SocketBase
             get { return AppServer.Config; }
         }
 
+        IReceiveFilter<TRequestInfo> m_ReceiveFilter;
+
+        #endregion
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AppSession&lt;TAppSession, TRequestInfo&gt;"/> class.
+        /// </summary>
         public AppSession()
         {
-            try
-            {              
-                m_key = 0;
-                //UserInfo = new UserInfo();
-            }
-            catch (Exception)
-            {
-
-
-            }
+            this.StartTime = DateTime.Now;
+            this.LastActiveTime = this.StartTime;
         }
-        public void Disconnect()
+        public virtual string GetNickname() { return ""; }
+
+        public virtual uint GetUID() { return 0; }
+
+        /// <summary>
+        /// Initializes the specified app session by AppServer and SocketSession.
+        /// </summary>
+        /// <param name="appServer">The app server.</param>
+        /// <param name="socketSession">The socket session.</param>
+        public virtual void Initialize(IAppServer<TAppSession, TRequestInfo> appServer, ISocketSession socketSession)
         {
-            AppServer.OnNewSessionDisconnect(this as TAppSession);
+            var castedAppServer = (AppServerBase<TAppSession, TRequestInfo>)appServer;
+            AppServer = castedAppServer;
+            Charset = castedAppServer.TextEncoding;
+            SocketSession = socketSession;
+            m_oid = socketSession.m_oid;
+            m_Connected = true;
+            m_ReceiveFilter = castedAppServer.ReceiveFilterFactory.CreateFilter(appServer, this, socketSession.RemoteEndPoint);
+
+            var filterInitializer = m_ReceiveFilter as Interface.IReceiveFilterInitializer;
+            if (filterInitializer != null)
+                filterInitializer.Initialize(castedAppServer, this);
+
+            socketSession.Initialize(this);
+
+            OnInit();
         }
+
+        /// <summary>
+        /// Starts the session.
+        /// </summary>
+        void IAppSession.StartSession()
+        {
+            OnSessionStarted();
+        }
+
+        /// <summary>
+        /// Called when [init].
+        /// </summary>
+        protected virtual void OnInit()
+        {
+
+        }
+
+        /// <summary>
+        /// Called when [session started].
+        /// </summary>
+        protected virtual void OnSessionStarted()
+        {
+
+        }
+
         /// <summary>
         /// Called when [session closed].
         /// </summary>
         /// <param name="reason">The reason.</param>
-        internal protected virtual void OnSessionClosed()
+        internal protected virtual void OnSessionClosed(CloseReason reason)
         {
-            Close();
+
         }
-        //public void Close()
-        //{
-        //    if (AppClient != null && AppClient.Connected)
-        //    {
-        //        try
-        //        {
-        //            AppClient.Shutdown(SocketShutdown.Both);
-        //            AppClient.Disconnect(reuseSocket: false);
-        //            if (Packet != null)
-        //            {
-        //                Packet.Dispose();
-        //            }
-        //        }
-        //        finally
-        //        {
-        //            Connected = false;
-        //            AppClient.Close();
-        //        }
-        //    }
-        //    Dispose();
-        //}
+
+
+        /// <summary>
+        /// Handles the exceptional error, it only handles application error.
+        /// </summary>
+        /// <param name="e">The exception.</param>
+        protected virtual void HandleException(Exception e)
+        {
+            //Logger.Error(this, e);
+            this.Close(CloseReason.ApplicationError);
+        }
+
+        /// <summary>
+        /// Handles the unknown request.
+        /// </summary>
+        /// <param name="requestInfo">The request info.</param>
+        protected virtual void HandleUnknownRequest(TRequestInfo requestInfo)
+        {
+
+        }
+
+        internal void InternalHandleUnknownRequest(TRequestInfo requestInfo)
+        {
+            HandleUnknownRequest(requestInfo);
+        }
+
+        internal void InternalHandleExcetion(Exception e)
+        {
+            HandleException(e);
+        }
+
+        /// <summary>
+        /// Closes the session by the specified reason.
+        /// </summary>
+        /// <param name="reason">The close reason.</param>
+        public virtual void Close(CloseReason reason)
+        {
+            this.SocketSession.Close(reason);
+        }
+
         /// <summary>
         /// Closes this session.
         /// </summary>
@@ -148,6 +253,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             Close(CloseReason.ServerClosing);
         }
+
         #region Sending processing
 
         /// <summary>
@@ -410,8 +516,8 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             if (currentRequestLength >= maxRequestLength)
             {
-                if (Logger.IsErrorEnabled)
-                    Logger.Error(this, string.Format("Max request length: {0}, current processed length: {1}", maxRequestLength, currentRequestLength));
+                //if (Logger.IsErrorEnabled)
+                //    Logger.Error(this, string.Format("Max request length: {0}, current processed length: {1}", maxRequestLength, currentRequestLength));
 
                 Close(CloseReason.ProtocolError);
                 return null;
@@ -465,192 +571,109 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-        #endregion
+        public void Initialize(IAppServer appServer, Socket client)
+        {
+            //throw new NotImplementedException();
+        }
 
         public void Dispose()
         {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
+            //throw new NotImplementedException();
         }
 
-        protected virtual void Dispose(bool disposing)
+        public void HandleExceptionalError(Exception e)
         {
-            if (disposing)
-            {
-                return;
-            }
-            if (disposing)
-            {
-                if (AppClient != null)
-                {
-                    AppClient.Dispose();
-                    AppClient = null;
-                }
-                Console.WriteLine("Session.Dispose()");
-            }
-            Disposed = true;
+          //  //throw new NotImplementedException();
         }
 
+        #endregion
+    }
 
-        public virtual void Send(Packet packet)
+    /// <summary>
+    /// AppServer basic class for whose request infoe type is StringRequestInfo
+    /// </summary>
+    /// <typeparam name="TAppSession">The type of the app session.</typeparam>
+    public abstract class AppSession<TAppSession> : AppSession<TAppSession, StringRequestInfo>
+        where TAppSession : AppSession<TAppSession, StringRequestInfo>, IAppSession, new()
+    {
+
+        private bool m_AppendNewLineForResponse = false;
+
+        private static string m_NewLine = "\r\n";
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AppSession&lt;TAppSession&gt;"/> class.
+        /// </summary>
+        public AppSession()
+            : this(true)
         {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(packet.GetBytes, m_key);
-            try
-            {
-                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
-            }
-            catch (Exception)
-            {
 
-
-            }
-        }
-        
-        public virtual void Send(byte[] message)
-        {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(message, m_key);
-            try
-            {
-                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
-            }
-            catch (Exception)
-            {
-
-
-            } 
-        }
-
-        public virtual void SendResponse(Packet packet)
-        {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(packet.GetBytes, m_key);
-            try
-            {
-                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
-            }
-            catch (Exception)
-            {
-
-
-            }
-        }
-        
-        public virtual void SendResponse(byte[] message)
-        {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(message, m_key);
-            try
-            {
-                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
-            }
-            catch (Exception)
-            {
-
-
-            }
-        }
-        public virtual void Send()
-        {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(Packet.GetBytes, m_key);
-            try
-            {
-                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
-            }
-            catch (Exception)
-            {
-
-
-            }
-        }
-        public virtual void SendResponse()
-        {
-            var GetBytes = Cryptor.HandlePacket.Pang.ServerEncrypt(Packet.GetBytes, m_key);
-            try
-            {
-                AppClient.BeginSend(GetBytes, 0, GetBytes.Length, SocketFlags.None, SendCallback, AppClient);
-            }
-            catch (Exception)
-            {
-
-
-            }
-        }
-
-        
-        public void Initialize(IAppServer appServer, Socket client)
-        {
-            var castedAppServer = (AppServerBase<TAppSession, TPacket>)appServer;
-            AppServer = castedAppServer;
-            AppClient = client;
-            StartTime = DateTime.Now;
-            Connected = AppClient.Connected;
-        }
-
-        public void SendCallback(IAsyncResult result)
-        {
-            try
-            {
-                var clientSocket = (Socket)result.AsyncState;
-                int bytesSent = clientSocket.EndSend(result);
-                Console.WriteLine("Sent " + bytesSent + " bytes to the server.");
-            }
-            catch (Exception ex)
-            {
-                // Handle the exception appropriately (logging, error messages, etc.)
-                Console.WriteLine("An error occurred in the send callback: " + ex.Message);
-            }
-        }
-
-        public virtual string GetNickname() { return ""; }
-
-        public virtual uint GetUID() { return 0; }
-
-        public int ProcessRequest(byte[] readBuffer, int offset, int length, bool toBeCopied)
-        {
-            throw new NotImplementedException();
         }
 
         /// <summary>
-        /// Closes the session by the specified reason.
+        /// Initializes a new instance of the <see cref="AppSession&lt;TAppSession&gt;"/> class.
         /// </summary>
-        /// <param name="reason">The close reason.</param>
-        public virtual void Close(CloseReason reason)
+        /// <param name="appendNewLineForResponse">if set to <c>true</c> [append new line for response].</param>
+        public AppSession(bool appendNewLineForResponse)
         {
-            this.SocketSession.Close(reason);
+            m_AppendNewLineForResponse = appendNewLineForResponse;
         }
 
-        public void StartSession()
+        /// <summary>
+        /// Handles the unknown request.
+        /// </summary>
+        /// <param name="requestInfo">The request info.</param>
+        protected override void HandleUnknownRequest(StringRequestInfo requestInfo)
         {
-            throw new NotImplementedException();
+            Send("Unknown request: " + requestInfo.m_oid);
+        }
+
+        /// <summary>
+        /// Processes the sending message.
+        /// </summary>
+        /// <param name="rawMessage">The raw message.</param>
+        /// <returns></returns>
+        protected virtual string ProcessSendingMessage(string rawMessage)
+        {
+            if (!m_AppendNewLineForResponse)
+                return rawMessage;
+
+            if (AppServer.Config.Mode == SocketMode.Udp)
+                return rawMessage;
+
+            if (string.IsNullOrEmpty(rawMessage) || !rawMessage.EndsWith(m_NewLine))
+                return rawMessage + m_NewLine;
+            else
+                return rawMessage;
+        }
+
+        /// <summary>
+        /// Sends the specified message.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        /// <returns></returns>
+        public override void Send(string message)
+        {
+            base.Send(ProcessSendingMessage(message));
+        }
+
+        /// <summary>
+        /// Sends the response.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        /// <param name="paramValues">The param values.</param>
+        /// <returns>Indicate whether the message was pushed into the sending queue</returns>
+        public override void Send(string message, params object[] paramValues)
+        {
+            base.Send(ProcessSendingMessage(message), paramValues);
         }
     }
-    public abstract class AppSession<TAppSession> : AppSession<TAppSession, Packet>
-        where TAppSession : AppSession<TAppSession, Packet>, IAppSession, new()
-    {/// <summary>
-     /// Sends the specified message.
-     /// </summary>
-     /// <param name="message">The message.</param>
-     /// <returns></returns>
-        public override void Send(byte[] message)
-        {
-            base.Send(message);
-        }
-    }
+
     /// <summary>
-    /// AppServer basic class for whose request infoe type is
+    /// AppServer basic class for whose request infoe type is StringRequestInfo
     /// </summary>
     public class AppSession : AppSession<AppSession>
     {
-        internal bool Clear()
-        {
-            return true;        }
 
-        internal void SetOID(uint index)
-        {
-            m_oid = index;
-        }
-
-        internal void SetTimeStartAndTick(int tickCount)
-        {
-         //   throw new NotImplementedException();
-        }
     }
 }

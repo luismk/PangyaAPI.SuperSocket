@@ -120,4 +120,9 @@ namespace PangyaAPI.SuperSocket.Interface
         /// </value>
         int OrigReceiveOffset { get; }
     }
+    public interface ISocketSession<T> : ISocketSession
+        where T : IAppSession, new()
+    {
+        void Initialize(IAppServer<T> appServer, T appSession, Socket client);
+    }
 }

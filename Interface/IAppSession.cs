@@ -10,7 +10,7 @@ namespace PangyaAPI.SuperSocket.Interface
     /// <summary>
     /// interface usada pelo AppSession
     /// </summary>
-    public interface IAppSession : ISessionBase, Utilities.Interface.IDisposeable
+    public interface IAppSession : ISessionBase
     {
         /// <summary>
         /// Gets the app server.
@@ -95,6 +95,9 @@ namespace PangyaAPI.SuperSocket.Interface
         //void SendCallback(IAsyncResult result);
         string GetNickname();
         uint GetUID();
+
+        void HandleExceptionalError(Exception e);
+
     }
     /// <summary>
     /// The interface for appSession

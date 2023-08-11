@@ -1,11 +1,30 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
+using System.Security.Authentication;
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
-    internal class ListenerInfo
+    /// <summary>
+    /// Listener inforamtion
+    /// </summary>
+    [Serializable]
+    public class ListenerInfo
     {
+        /// <summary>
+        /// Gets or sets the listen endpoint.
+        /// </summary>
+        /// <value>
+        /// The end point.
+        /// </value>
         public IPEndPoint EndPoint { get; set; }
+
+        /// <summary>
+        /// Gets or sets the listen backlog.
+        /// </summary>
+        /// <value>
+        /// The back log.
+        /// </value>
         public int BackLog { get; set; }
-        public object Security { get; set; }
+
     }
 }

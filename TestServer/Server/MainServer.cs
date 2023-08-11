@@ -8,15 +8,15 @@ namespace ServerConsole.Server
     /// </summary>
     public class MainServer : PangyaServer<Player>
     {
-        public override PangyaAPI.SuperSocket.Interface.IAppSession GetSessionByNick(string Nick)
-        {
-            throw new System.NotImplementedException();
-        }
+        //public override PangyaAPI.SuperSocket.Interface.IAppSession GetSessionByNick(string Nick)
+        //{
+        //    throw new System.NotImplementedException();
+        //}
 
-        public override PangyaAPI.SuperSocket.Interface.IAppSession GetSessionByUserName(string User)
-        {
-            throw new System.NotImplementedException();
-        }
+        //public override PangyaAPI.SuperSocket.Interface.IAppSession GetSessionByUserName(string User)
+        //{
+        //    throw new System.NotImplementedException();
+        //}
 
         protected override void SendKeyOnConnect(Player session)
         {

@@ -11,7 +11,7 @@ namespace ServerConsole
         {
             var serverApp = new MainServer();//chama a class com servidor imbutido
 
-            serverApp.StartingServer();//inicializa o server
+            serverApp.Setup();//inicializa o server
             serverApp.NewSessionConnected += Handle_NewSessionConnected;
             serverApp.NewRequestReceived += Handle_NewRequestReceived;
             //faz um laço para o servidor fica sempre correndo
