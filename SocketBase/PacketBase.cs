@@ -27,6 +27,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             Writer = new PangyaBinaryWriter();
         }
+        public AppPacketBase(short PacketID)
+        {
+            Writer = new PangyaBinaryWriter();
+        }
         public AppPacketBase(byte[] message, bool IsClient = false)
         {
             if (IsClient)

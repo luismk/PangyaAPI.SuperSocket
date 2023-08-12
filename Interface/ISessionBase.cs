@@ -13,7 +13,7 @@ namespace PangyaAPI.SuperSocket.Interface
     /// </summary>
     public interface ISessionBase
     {
-        byte m_key { get; set; }
+        byte m_key { get; }
 
         /// <summary>
         /// Gets the session ID.

@@ -95,6 +95,7 @@ namespace PangyaAPI.SuperSocket.Interface
         //void SendCallback(IAsyncResult result);
         string GetNickname();
         uint GetUID();
+        string GetID();
 
         void HandleExceptionalError(Exception e);
 

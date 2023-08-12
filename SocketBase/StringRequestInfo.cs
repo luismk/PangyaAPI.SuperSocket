@@ -13,7 +13,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="key">The key.</param>
         /// <param name="body">The body.</param>
         /// <param name="parameters">The parameters.</param>
-        public StringRequestInfo(uint key, string body, string[] parameters)
+        public StringRequestInfo(string key, string body, string[] parameters)
             : base(key, body)
         {
             Parameters = parameters;

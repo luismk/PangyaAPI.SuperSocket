@@ -83,6 +83,7 @@ namespace PangyaAPI.SuperSocket.Interface
         /// Gets the Receive filter factory.
         /// </summary>
         object ReceiveFilterFactory { get; }
+        object SendingQueuePool { get; }
     }
 
 

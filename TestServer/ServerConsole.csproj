@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Server\TestClient.cs" />
     <Compile Include="Server\MainServer.cs" />
     <Compile Include="Session\Player.cs" />
   </ItemGroup>
@@ -54,6 +55,14 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\PangyaAPI.Player\PangyaAPI.Player.csproj">
+      <Project>{a507f3e5-c9b8-4e57-b360-0f868dc21e22}</Project>
+      <Name>PangyaAPI.Player</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\PangyaAPI.Utilities\PangyaAPI.Utilities.csproj">
+      <Project>{1e2be994-1794-47ce-b66b-65f02d42570c}</Project>
+      <Name>PangyaAPI.Utilities</Name>
+    </ProjectReference>
     <ProjectReference Include="..\PangyaAPI.SuperSocket.csproj">
       <Project>{db6a8db2-c62c-4838-b4ff-e9b1884433b4}</Project>
       <Name>PangyaAPI.SuperSocket</Name>

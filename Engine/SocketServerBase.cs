@@ -8,7 +8,7 @@ using System;
 
 namespace PangyaAPI.SuperSocket.Engine
 {
-    abstract class SocketServerBase : ISocketServer, IDisposable, IAsyncSocketEventComplete
+    abstract class SocketServerBase : ISocketServer, IDisposable
     {
         protected object SyncRoot = new object();
 
@@ -34,6 +34,7 @@ namespace PangyaAPI.SuperSocket.Engine
         {
             get { return this.SendingQueuePool; }
         }
+
         public SocketServerBase(IAppServer appServer, ListenerInfo[] listeners)
         {
             AppServer = appServer;
@@ -48,25 +49,17 @@ namespace PangyaAPI.SuperSocket.Engine
         {
             IsStopped = false;
 
-            try
-            {
-                var config = this.AppServer.Config;
+            //ILog log = AppServer.Logger;
 
-                if (!StartListeners())
-                    return false;
+            var config = AppServer.Config;
 
-            }
-            catch (Exception e)
-            {
-                return false;
-            }
+            var sendingQueuePool = new SmartPool<SendingQueue>();
+            sendingQueuePool.Initialize(Math.Max(config.MaxConnectionNumber / 6, 256),
+                    Math.Max(config.MaxConnectionNumber * 2, 256),
+                    new SendingQueueSourceCreator(config.SendingQueueSize));
 
-            IsRunning = true;
-            return true;
-        }
+            SendingQueuePool = sendingQueuePool;
 
-        private bool StartListeners()
-        {
             for (var i = 0; i < ListenerInfos.Length; i++)
             {
                 var listener = CreateListener(ListenerInfos[i]);
@@ -77,9 +70,18 @@ namespace PangyaAPI.SuperSocket.Engine
                 if (listener.Start(AppServer.Config))
                 {
                     Listeners.Add(listener);
+
+                    //if (log.IsDebugEnabled)
+                    //{
+                    //    log.DebugFormat("Listener ({0}) was started", listener.EndPoint);
+                    //}
                 }
                 else //If one listener failed to start, stop started listeners
                 {
+                    //if (log.IsDebugEnabled)
+                    //{
+                    //    log.DebugFormat("Listener ({0}) failed to start", listener.EndPoint);
+                    //}
 
                     for (var j = 0; j < Listeners.Count; j++)
                     {
@@ -91,6 +93,7 @@ namespace PangyaAPI.SuperSocket.Engine
                 }
             }
 
+            IsRunning = true;
             return true;
         }
 
@@ -98,14 +101,19 @@ namespace PangyaAPI.SuperSocket.Engine
 
         void OnListenerError(ISocketListener listener, Exception e)
         {
-           
+            //var logger = this.AppServer.Logger;
+
+            //if (!logger.IsErrorEnabled)
+            //    return;
+
+            //logger.Error(string.Format("Listener ({0}) error: {1}", listener.EndPoint, e.Message), e);
         }
 
         void OnListenerStopped(object sender, EventArgs e)
         {
             var listener = sender as ISocketListener;
 
-          
+            
         }
 
         protected abstract ISocketListener CreateListener(ListenerInfo listenerInfo);
@@ -123,14 +131,9 @@ namespace PangyaAPI.SuperSocket.Engine
 
             Listeners.Clear();
 
-            IsRunning = false;
-        }
+            SendingQueuePool = null;
 
-        void IAsyncSocketEventComplete.HandleSocketEventComplete(object sender, SocketAsyncEventArgs e)
-        {
-            var userToken = e.UserToken as SaeState;
-            var socketSession = userToken.SocketSession as IAsyncSocketSession;
-            socketSession.ProcessReceive(e);
+            IsRunning = false;
         }
 
         #region IDisposable Members

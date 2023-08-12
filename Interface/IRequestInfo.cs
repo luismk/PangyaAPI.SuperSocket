@@ -6,11 +6,9 @@
     public interface IRequestInfo
     {
         /// <summary>
-        /// Gets the connectionID of this request.
+        /// Gets the ID of this request.
         /// </summary>
-        uint m_oid { get; }
-
-        byte[] Message { get; set; }
+        short PacketID { get; }
     }
 
     /// <summary>

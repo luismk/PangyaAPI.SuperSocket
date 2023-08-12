@@ -9,6 +9,7 @@ using PangyaAPI.Player.Data;
 using PangyaAPI.SuperSocket.Engine;
 using PangyaAPI.SuperSocket.Interface;
 using PangyaAPI.Utilities;
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.SocketBase
 {
     /// <summary>
@@ -52,7 +53,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-       // public IFFHandle IFF { get; set; }
+        // public IFFHandle IFF { get; set; }
         public bool IFFLog { get; set; }
         public IniHandle Ini { get; set; }
         public ServerInfoEx m_si { get; set; }
@@ -73,7 +74,13 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             get { return this.ReceiveFilterFactory; }
         }
-
+        /// <summary>
+        /// Gets the Receive filter factory.
+        /// </summary>
+        object IAppServer.SendingQueuePool
+        {
+            get { return this.m_SocketServer.SendingQueuePool; }
+        }
         private ISocketServerFactory m_SocketServerFactory;
 
 
@@ -112,6 +119,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </value>
         public DateTime StartedTime { get; private set; }
 
+        public bool IsRunning { get => m_StateCode == ServerStateConst.Running; }
 
         ///// <summary>
         ///// Gets or sets the log factory.
@@ -138,7 +146,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
             try
             {
                 //Inicia Servidor
-                m_StateCode = ServerStateConst.Initializing;
                 StartedTime = DateTime.Now;
                 ListBlockMac = new List<TableMac>();
                 m_si = new ServerInfoEx();
@@ -176,7 +183,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         private void SetupBasic(IRootConfig rootConfig, IServerConfig config, ISocketServerFactory socketServerFactory)
         {
-          
+
             if (config == null)
                 throw new ArgumentNullException("config");
 
@@ -202,11 +209,18 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 m_ThreadPoolConfigured = true;
             }
 
-            if (socketServerFactory == null)
+            if (socketServerFactory == null && Listeners == null)
             {
-                var socketServerFactoryType = new SocketServerFactory();
+                m_Listeners = new ListenerInfo[]
+                {
+    new ListenerInfo
+    {
+        BackLog = m_si.MaxUser,
+        EndPoint = new IPEndPoint(ParseIPAddress(m_si.IP), m_si.Port)
+    }
+                };
 
-                socketServerFactory = (ISocketServerFactory)socketServerFactoryType.CreateSocketServer<IRequestInfo>(this, Listeners, config);
+                socketServerFactory = new SocketServerFactory();
             }
 
             m_SocketServerFactory = socketServerFactory;
@@ -235,7 +249,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             if (!SetupListeners(config))
                 return false;
 
-          
+
             return true;
         }
 
@@ -246,12 +260,11 @@ namespace PangyaAPI.SuperSocket.SocketBase
             //Check receiveFilterFactory
             if (ReceiveFilterFactory == null)
             {
-                ReceiveFilterFactory = CreateDefaultReceiveFilterFactory();
+                ReceiveFilterFactory = CreateDefaultReceiveFilterFactory();//aqui pode ser um problema @!
 
                 if (ReceiveFilterFactory == null)
                 {
-                    //if (//Logger.IsErrorEnabled)
-                        //Logger.Error("receiveFilterFactory is required!");
+                    _smp.Message_Pool.push("receiveFilterFactory is required!");
 
                     return false;
                 }
@@ -281,7 +294,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             catch (Exception e)
             {
                 //if (//Logger.IsErrorEnabled)
-                    //Logger.Error("Failed to create ServerSummary instance!", e);
+                _smp.Message_Pool.push("Failed to create ServerSummary instance!", e, _smp.type_msg.CL_ONLY_CONSOLE);
 
                 return false;
             }
@@ -340,7 +353,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             SetupBasic(rootConfig, config, socketServerFactory);
 
-           
+
 
             if (!SetupMedium(receiveFilterFactory, connectionFilters))
                 return false;
@@ -441,13 +454,12 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             try
             {
-                m_SocketServer = m_SocketServerFactory.CreateSocketServer<TRequestInfo>(this, m_Listeners, Config);
+                m_SocketServer = new SocketServerFactory().CreateSocketServer<TRequestInfo>(this, m_Listeners, Config);
                 return m_SocketServer != null;
             }
             catch (Exception e)
             {
-                //if (//Logger.IsErrorEnabled)
-                    //Logger.Error(e);
+                _smp.Message_Pool.push(e);
 
                 return false;
             }
@@ -488,7 +500,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                     if (!string.IsNullOrEmpty(config.Ip))
                     {
                         //if (//Logger.IsErrorEnabled)
-                            //Logger.Error("Port is required in config!");
+                        _smp.Message_Pool.push("Port is required in config!");
 
                         return false;
                     }
@@ -502,7 +514,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                     if (listeners.Any())
                     {
                         //if (//Logger.IsErrorEnabled)
-                            //Logger.Error("If you configured Ip and Port in server node, you cannot defined listener in listeners node any more!");
+                        _smp.Message_Pool.push("If you configured Ip and Port in server node, you cannot defined listener in listeners node any more!");
 
                         return false;
                     }
@@ -512,7 +524,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 if (!listeners.Any())
                 {
                     //if (//Logger.IsErrorEnabled)
-                        //Logger.Error("No listener defined!");
+                    _smp.Message_Pool.push("No listener defined!");
 
                     return false;
                 }
@@ -524,7 +536,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             catch (Exception e)
             {
                 //if (//Logger.IsErrorEnabled)
-                    //Logger.Error(e);
+                _smp.Message_Pool.push(e);
 
                 return false;
             }
@@ -567,7 +579,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                     throw new Exception("You cannot start a server instance which has not been setup yet.");
 
                 //if (//Logger.IsErrorEnabled)
-                    //Logger.ErrorFormat("This server instance is in the state {0}, you cannot start it now.", (ServerState)origStateCode);
+                //Logger.ErrorFormat("This server instance is in the state {0}, you cannot start it now.", (ServerState)origStateCode);
 
                 return false;
             }
@@ -597,13 +609,13 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 //if (//Logger.IsErrorEnabled)
                 //{
-                    //Logger.Error("One exception wa thrown in the method 'OnStartup()'.", e);
+                _smp.Message_Pool.push("One exception wa thrown in the method 'OnStartup()'.", e);
                 //}
             }
             finally
             {
                 //if (//Logger.IsInfoEnabled)
-                    //Logger.Info(string.Format("The server instance {0} has been started!", Name));
+                //Logger.Info(string.Format("The server instance {0} has been started!", Name));
             }
 
             return true;
@@ -615,7 +627,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         [Obsolete("Use OnStarted() instead")]
         protected virtual void OnStartup()
         {
-
+            _smp.Message_Pool.push("[AppServer.OnStartup][Log]: Server starting...", _smp.type_msg.CL_ONLY_CONSOLE);
         }
 
         /// <summary>
@@ -623,7 +635,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         protected virtual void OnStarted()
         {
-
+            _smp.Message_Pool.push("[AppServer.OnStarted][Log]: Start Server in Port: " + m_si.Port, _smp.type_msg.CL_ONLY_CONSOLE);
         }
 
         /// <summary>
@@ -655,7 +667,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             m_ServerStatus[StatusInfoKeys.StartedTime] = null;
 
             //if (//Logger.IsInfoEnabled)
-                //Logger.Info(string.Format("The server instance {0} has been stopped!", Name));
+            //Logger.Info(string.Format("The server instance {0} has been stopped!", Name));
         }
 
         private Func<TAppSession, byte[], int, int, bool> m_RawDataReceivedHandler;
@@ -701,7 +713,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             remove { m_RequestHandler -= value; }
         }
 
-       
+
         /// <summary>
         /// Executes the command for the session.
         /// </summary>
@@ -781,7 +793,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 if (!currentFilter.AllowConnect(remoteAddress))
                 {
                     //if (//Logger.IsInfoEnabled)
-                        //Logger.InfoFormat("A connection from {0} has been refused by filter {1}!", remoteAddress, currentFilter.Name);
+                    //Logger.InfoFormat("A connection from {0} has been refused by filter {1}!", remoteAddress, currentFilter.Name);
                     return false;
                 }
             }
@@ -880,7 +892,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
             catch (Exception e)
             {
-                //Logger.Error(e);
+                _smp.Message_Pool.push(e);
             }
         }
 
@@ -903,7 +915,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             //Even if LogBasicSessionActivity is false, we also log the unexpected closing because the close reason probably be useful
             //if (//Logger.IsInfoEnabled && (Config.LogBasicSessionActivity || (reason != CloseReason.ServerClosing && reason != CloseReason.ClientClosing && reason != CloseReason.ServerShutdown && reason != CloseReason.SocketError)))
-                //Logger.Info(session, string.Format("This session was closed for {0}!", reason));
+            //Logger.Info(session, string.Format("This session was closed for {0}!", reason));
 
             var appSession = session.AppSession as TAppSession;
             appSession.Connected = false;
@@ -946,7 +958,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
             catch (Exception e)
             {
-                //Logger.Error(e);
+                _smp.Message_Pool.push(e);
             }
         }
 
@@ -989,10 +1001,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         public abstract int SessionCount { get; }
 
-       
+
         #region IActiveConnector
 
-      
+
 
         #endregion ISystemEndPoint
 
@@ -1061,16 +1073,68 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             throw new NotImplementedException();
         }
-
-        public StatusInfoAttribute[] GetServerStatusMetadata()
+        StatusInfoAttribute[] IStatusInfoSource.GetServerStatusMetadata()
         {
-            throw new NotImplementedException();
+            return null;
         }
 
-        public StatusInfoCollection CollectServerStatus(StatusInfoCollection bootstrapStatus)
+
+        StatusInfoCollection IStatusInfoSource.CollectServerStatus(StatusInfoCollection bootstrapStatus)
         {
-            throw new NotImplementedException();
+            UpdateServerStatus(m_ServerStatus);
+            OnServerStatusCollected(bootstrapStatus, m_ServerStatus);
+            return m_ServerStatus;
         }
+
+        public abstract void onHeartBeat();
+
+        public bool haveBanList(string _ip_address, string _mac_address, bool _check_mac = true)
+        {
+            if (_check_mac)
+            {
+                // Verifica primeiro se o MAC Address foi bloqueado
+
+                // Cliente não enviou um MAC Address válido, bloquea essa conexão que é hacker que mudou o ProjectG
+                if (string.IsNullOrEmpty(_mac_address))
+                    return true;    // Cliente não enviou um MAC Address válido, bloquea essa conexão que é hacker que mudou o ProjectG
+
+                foreach (var item in ListBlockMac)
+                {
+                    if (string.IsNullOrEmpty(item.Mac_Adress) == false && item.Mac_Adress == _mac_address)
+                    {
+
+                    }
+                    return true;	// MAC Address foi bloqueado
+                }
+            }
+            // IP Address inválido, bloquea essa conexão que é Hacker ou Bug
+
+            if (string.IsNullOrEmpty(_ip_address))
+                return true;
+
+            return false;
+
+        }
+        private List<string> v_mac_ban_list;
+        private List<string> v_ip_ban_list;
+        public virtual void AppMonitor()
+        {
+            while (IsRunning)
+            {
+                if (_smp.Message_Pool.checkUpdateDayLog())
+                    _smp.Message_Pool.push("[AppServer::monitor::UpdateLogFiles][Log] Atualizou os arquivos de Log por que trocou de dia.");
+                try
+                {
+                    //cmdUpdateServerList();  // Pega a Lista de servidores online
+
+                    //cmdUpdateListBlock_IP_MAC();    // Pega a List de IP e MAC Address que estão bloqueadas
+
+                    onHeartBeat();
+                }
+                catch { }
+            }
+        }
+
 
         #endregion
     }

@@ -163,7 +163,7 @@ namespace PangyaAPI.SuperSocket.Engine
             this.SyncSend = this.Config.SyncSend;
             if (this.m_SendingQueuePool == null)
             {
-                this.m_SendingQueuePool = (ISmartPool<SendingQueue>)((SocketServerBase)(object)((ISocketServerAccessor)appSession.AppServer)).SendingQueuePool;
+                this.m_SendingQueuePool = (ISmartPool<SendingQueue>)appSession.AppServer.SendingQueuePool;
             }
             SendingQueue val = default(SendingQueue);
             if (this.m_SendingQueuePool.TryGet(out val))

@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System;
+using PangyaAPI.SuperSocket.Interface;
+using PangyaAPI.SuperSocket.SocketBase;
 
 namespace PangyaAPI.SuperSocket.Engine
 {
@@ -93,7 +95,7 @@ namespace PangyaAPI.SuperSocket.Engine
 
             Interlocked.Increment(ref m_UpdatingCount);
 
-            while (true)
+            while (!m_ReadOnly)
             {
                 bool conflict = false;
 
@@ -127,20 +129,20 @@ namespace PangyaAPI.SuperSocket.Engine
 
             bool conflict;
 
-            while (true)
+            while (!m_ReadOnly)
             {
                 if (TryEnqueue(items, out conflict, trackID))
-                    break;
-
-                if (!conflict)
                 {
                     Interlocked.Decrement(ref m_UpdatingCount);
-                    return false;
+                    return true;
                 }
+
+                if (!conflict)
+                    break;
             }
 
             Interlocked.Decrement(ref m_UpdatingCount);
-            return true;
+            return false;
         }
 
         private bool TryEnqueue(IList<ArraySegment<byte>> items, out bool conflict, ushort trackID)
@@ -461,6 +463,44 @@ namespace PangyaAPI.SuperSocket.Engine
 
                 break;
             }
+        }
+    }
+
+
+    /// <summary>
+    /// SendingQueueSourceCreator
+    /// </summary>
+    public class SendingQueueSourceCreator : ISmartPoolSourceCreator<SendingQueue>
+    {
+        private int m_SendingQueueSize;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SendingQueueSourceCreator" /> class.
+        /// </summary>
+        /// <param name="sendingQueueSize">Size of the sending queue.</param>
+        public SendingQueueSourceCreator(int sendingQueueSize)
+        {
+            m_SendingQueueSize = sendingQueueSize;
+        }
+
+        /// <summary>
+        /// Creates the specified size.
+        /// </summary>
+        /// <param name="size">The size.</param>
+        /// <param name="poolItems">The pool items.</param>
+        /// <returns></returns>
+        public ISmartPoolSource Create(int size, out SendingQueue[] poolItems)
+        {
+            var source = new ArraySegment<byte>[size * m_SendingQueueSize];
+
+            poolItems = new SendingQueue[size];
+
+            for (var i = 0; i < size; i++)
+            {
+                poolItems[i] = new SendingQueue(source, i * m_SendingQueueSize, m_SendingQueueSize);
+            }
+
+            return new SmartPoolSource(source, size);
         }
     }
 }

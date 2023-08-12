@@ -10,10 +10,10 @@ using System.Threading.Tasks;
 namespace PangyaAPI.SuperSocket.SocketBase
 {
 
-    public abstract partial class PangyaServer<T> : AppServer<T, IRequestInfo>
-     where T : AppSession<T, IRequestInfo>, IAppSession, new()
+    public abstract partial class PangyaServer<T> : AppServer<T, PangyaRequestInfo>
+     where T : AppSession<T, PangyaRequestInfo>, IAppSession, new()
     {
-        public PangyaServer()
+        public PangyaServer() :base(new DefaultReceiveFilterFactory<PangyaReceiveFilter, PangyaRequestInfo>())
         {
             try
             {
@@ -30,9 +30,8 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 WriteConsole.Error(ex.Message);
             }
         }
-        private void ProcessNewMessage(T session, IRequestInfo requestInfo)
+        private void ProcessNewMessage(T session, PangyaRequestInfo requestInfo)
         {
-           var requestNew = requestInfo as PangyaPacketReceive;
         }
 
         public bool StartingServer()
@@ -85,7 +84,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         protected override void OnNewSessionConnected(T session)
         {
-            SendKeyOnConnect(session);
+            onAcceptCompleted(session);
             if (session.Connected)
             {
                 WriteConsole.WriteLine($"[PLAYER_CONNETED]: ID => {session.m_oid}, Connection => {session?.GetAdress}", ConsoleColor.Green);

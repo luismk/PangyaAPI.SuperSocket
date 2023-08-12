@@ -8,6 +8,8 @@ using System.Security.Authentication;
 using System.Text;
 using System.Threading;
 using PangyaAPI.SuperSocket.Interface;
+using PangyaAPI.Utilities.BinaryModels;
+
 namespace PangyaAPI.SuperSocket.SocketBase
 {
     /// <summary>
@@ -73,8 +75,12 @@ namespace PangyaAPI.SuperSocket.SocketBase
             get { return m_Connected; }
             internal set { m_Connected = value; }
         }
+        byte Key { get; set; }
 
-        public byte m_key { get; set; }
+        public byte m_key
+        {
+            get { return Key; }
+        }
         public uint m_oid { get; set; }
         public string GetAdress
         {
@@ -82,7 +88,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             {
                 if (Connected)
                 {
-                    return RemoteEndPoint.Port.ToString() + ":" + RemoteEndPoint.Address.ToString();
+                    return RemoteEndPoint.Address.ToString() + ":" + RemoteEndPoint.Port.ToString();
                 }
                 else
                 {
@@ -147,6 +153,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             this.LastActiveTime = this.StartTime;
         }
         public virtual string GetNickname() { return ""; }
+        public virtual string GetID() { return ""; }
 
         public virtual uint GetUID() { return 0; }
 
@@ -300,6 +307,23 @@ namespace PangyaAPI.SuperSocket.SocketBase
             InternalSend(new ArraySegment<byte>(data, offset, length));
         }
 
+        public virtual void Send(byte[] data)
+        {
+            InternalSend(new ArraySegment<byte>(data, 0, data.Length));
+        }
+
+        public virtual void SendResponse(byte[] data)
+        {
+            InternalSend(new ArraySegment<byte>(data, 0, data.Length));
+        }
+        public virtual void Send(Packet packet)
+        {
+            InternalSend(new ArraySegment<byte>(packet.GetBytes, 0, packet.GetBytes.Length));
+        }
+        public virtual void Send(PangyaBinaryWriter packet)
+        {
+            InternalSend(new ArraySegment<byte>(packet.GetBytes, 0, packet.GetBytes.Length));
+        }
         private bool InternalTrySend(ArraySegment<byte> segment)
         {
             if (!SocketSession.TrySend(segment))
@@ -488,7 +512,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
             var currentRequestLength = m_ReceiveFilter.LeftBufferSize;
 
             var requestInfo = m_ReceiveFilter.Filter(readBuffer, offset, length, toBeCopied, out rest);
-
             if (m_ReceiveFilter.State == FilterState.Error)
             {
                 rest = 0;
@@ -625,7 +648,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="requestInfo">The request info.</param>
         protected override void HandleUnknownRequest(StringRequestInfo requestInfo)
         {
-            Send("Unknown request: " + requestInfo.m_oid);
+            Send("Unknown request: " + requestInfo.PacketID);
         }
 
         /// <summary>

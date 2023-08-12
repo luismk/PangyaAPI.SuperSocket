@@ -21,7 +21,11 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="body">The body.</param>
-        public RequestInfo(uint key, TRequestBody body)
+        public RequestInfo(short key, TRequestBody body)
+        {
+            Initialize(key, body);
+        }
+        public RequestInfo(string key, TRequestBody body)
         {
             Initialize(key, body);
         }
@@ -31,22 +35,30 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="key">The key.</param>
         /// <param name="body">The body.</param>
-        protected void Initialize(uint key, TRequestBody body)
+        protected void Initialize(short key, TRequestBody body)
         {
-            m_oid = key;
+            PacketID = key;
             Body = body;
         }
+
+        protected void Initialize(string key, TRequestBody body)
+        {
+            Key = key;
+            Body = body;
+        }
+        /// <summary>
+        /// Gets the connectionID of this request.
+        /// </summary>
+        public short PacketID { get; private set; }
 
         /// <summary>
         /// Gets the connectionID of this request.
         /// </summary>
-        public uint m_oid { get; private set; }
-
+        public string Key { get; private set; }
         /// <summary>
         /// Gets the body.
         /// </summary>
         public TRequestBody Body { get; private set; }
-        public byte[] Message { get; set; }
     }
 
     /// <summary>
@@ -69,7 +81,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="key">The key.</param>
         /// <param name="header">The header.</param>
         /// <param name="body">The body.</param>
-        public RequestInfo(uint key, TRequestHeader header, TRequestBody body)
+        public RequestInfo(short key, TRequestHeader header, TRequestBody body)
             : base(key, body)
         {
             Header = header;
@@ -81,7 +93,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="key">The key.</param>
         /// <param name="header">The header.</param>
         /// <param name="body">The body.</param>
-        public void Initialize(uint key, TRequestHeader header, TRequestBody body)
+        public void Initialize(short key, TRequestHeader header, TRequestBody body)
         {
             base.Initialize(key, body);
             Header = header;

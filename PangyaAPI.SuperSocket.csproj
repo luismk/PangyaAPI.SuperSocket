@@ -47,6 +47,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CRYPTS\Crypt.cs" />
+    <Compile Include="CRYPTS\CryptOracle.cs" />
     <Compile Include="Engine\BufferBaseState.cs" />
     <Compile Include="Engine\BufferManager.cs" />
     <Compile Include="Engine\BufferState.cs" />
@@ -61,6 +63,7 @@
     <Compile Include="Engine\SocketSession.cs" />
     <Compile Include="Engine\SocketSessionClosedEventArgs.cs" />
     <Compile Include="Engine\TcpAsyncSocketListener.cs" />
+    <Compile Include="Ext\BinaryUtil.cs" />
     <Compile Include="Ext\ConfigurationExtension.cs" />
     <Compile Include="Ext\SocketEx.cs" />
     <Compile Include="Ext\Tools.cs" />
@@ -110,13 +113,19 @@
     <Compile Include="Engine\AsyncSocketServer.cs" />
     <Compile Include="Engine\AsyncSocketSession.cs" />
     <Compile Include="Engine\AsyncStreamSocketSession.cs" />
+    <Compile Include="SocketBase\ArraySegmentEx.cs" />
+    <Compile Include="SocketBase\ArraySegmentList.cs" />
+    <Compile Include="SocketBase\BasicRequestInfoParser.cs" />
+    <Compile Include="SocketBase\CommandLineReceiveFilterFactory.cs" />
     <Compile Include="SocketBase\CommandUpdateEventArgs.cs" />
     <Compile Include="SocketBase\CommandUpdateInfo.cs" />
+    <Compile Include="SocketBase\DefaultReceiveFilterFactory.cs" />
     <Compile Include="SocketBase\ExportFactory.cs" />
     <Compile Include="SocketBase\FilterState.cs" />
     <Compile Include="Interface\IOffsetAdapter.cs" />
     <Compile Include="Interface\IReceiveFilter.cs" />
     <Compile Include="SocketBase\IPool.cs" />
+    <Compile Include="SocketBase\IRequestInfoParser.cs" />
     <Compile Include="SocketBase\ListenerConfig.cs" />
     <Compile Include="SocketBase\ListenerInfo.cs" />
     <Compile Include="SocketBase\Logger.cs" />
@@ -126,8 +135,10 @@
     <Compile Include="SocketBase\PangyaServer.cs" />
     <Compile Include="SocketBase\ProviderFactoryInfo.cs" />
     <Compile Include="SocketBase\ProviderKey.cs" />
+    <Compile Include="SocketBase\ReceiveFilterBase.cs" />
     <Compile Include="SocketBase\RequestInfo.cs" />
     <Compile Include="SocketBase\RootConfig.cs" />
+    <Compile Include="SocketBase\SearchMarkState.cs" />
     <Compile Include="SocketBase\ServerConfig.cs" />
     <Compile Include="SocketBase\SmartPool.cs" />
     <Compile Include="SocketBase\SocketServerFactory.cs" />
@@ -136,6 +147,9 @@
     <Compile Include="SocketBase\StatusInfoKeys.cs" />
     <Compile Include="SocketBase\StringRequestInfo.cs" />
     <Compile Include="Engine\TcpSocketServerBase.cs" />
+    <Compile Include="SocketBase\TerminatorReceiveFilter.cs" />
+    <Compile Include="SocketBase\TerminatorReceiveFilterFactory.cs" />
+    <Compile Include="SocketBase\WSABuf.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\source\repos\Pangya Universal Editor IFF\PangTools\PangyaAPI\PangyaAPI.IFF\PangyaAPI.IFF.csproj">

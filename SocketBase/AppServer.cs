@@ -79,18 +79,24 @@ namespace PangyaAPI.SuperSocket.SocketBase
             : base()
         {
             //IFF = new IFFHandle("data//pangya_jp.iff");
-            Ini = new IniHandle("Config//Server.ini");
+            Ini = new IniHandle("Config//server.ini");
             m_si = new ServerInfoEx();
         }
 
       public AppServer(string ServerName)
            : base()
         {
-
+            //IFF = new IFFHandle("data//pangya_jp.iff");
+            Ini = new IniHandle("Config//server.ini");
+            m_si = new ServerInfoEx();
         }
 
         #region
-        protected abstract void SendKeyOnConnect(TAppSession session);
+        /// <summary>
+        /// metodo resposavel por envia o pacote de conexao com pangya " HELLO "
+        /// </summary>
+        /// <param name="session"></param>
+        protected abstract void onAcceptCompleted(TAppSession session);
         #endregion
 
         public bool LoadingFiles()
@@ -104,12 +110,14 @@ namespace PangyaAPI.SuperSocket.SocketBase
         protected AppServer(IReceiveFilterFactory<TRequestInfo> protocol)
             : base(protocol)
         {
-
+            //IFF = new IFFHandle("data//pangya_jp.iff");
+            Ini = new IniHandle("Config//server.ini");
+            m_si = new ServerInfoEx();
         }
 
         internal override IReceiveFilterFactory<TRequestInfo> CreateDefaultReceiveFilterFactory()
         {
-            return null;
+            return default;
         }
 
         /// <summary>
@@ -126,6 +134,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             if (Config.ClearIdleSession)
                 StartClearSessionTimer();
+
+            //Inicia Thread para monitor
+            var t2 = new Thread(new ThreadStart(AppMonitor));
+            t2.Start();
 
             return true;
         }
@@ -224,7 +236,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="state">The state.</param>
         private void ClearIdleSession(object state)
         {
-            if (Monitor.TryEnter(state))
+            if (System.Threading.Monitor.TryEnter(state))
             {
                 try
                 {
@@ -372,6 +384,17 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
+        public void SendAll(byte[] data)
+        {
+
+            foreach (var p in this.m_SessionDict.Values)
+            {
+                if (p != null &&p.SocketSession != null)
+                {
+                    p.Send(data);
+                }
+            }
+        }
         #endregion
     }
 }
