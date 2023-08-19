@@ -59,7 +59,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <returns></returns>
         public abstract TRequestInfo Filter(byte[] readBuffer, int offset, int length, bool toBeCopied, out int rest);
 
-
         /// <summary>
         /// Gets the size of the rest buffer.
         /// </summary>

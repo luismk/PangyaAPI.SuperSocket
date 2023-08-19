@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -57,6 +58,28 @@ namespace ServerConsole.Session
                 }
 
                 return stream.GetBuffer();
+            }
+            public byte[] Test()
+            {
+                using (var p = new PangyaBinaryWriter())
+                {
+                    p.Write((ushort)0x001);
+                    p.WriteByte(0);
+                    p.WritePStr("luisMK");
+                    p.WriteInt32(123);
+                    p.WriteInt32(4);
+                    p.WriteUInt16(16);           // 1 level, 1 pc bang(ACHO), com base no S4
+                    p.WriteInt32(0);                              // valor 0 Unknown
+                    p.WriteInt32(5);                              // valor 5 Unknown
+                    p.WriteTime();   // Time Build Login Server (ACHO)							- JP S9 ler mais ignora ele
+                    p.WriteZero(3);   // Time Build Login Server (ACHO)							- JP S9 ler mais ignora ele
+                    p.WritePStr("302540");                      // Alguma AuthKey aleatória para minha conta que eu não sei - JP S9 ler mais ignora ele
+                    p.WriteInt32(0);                             // Unknown valor - JP S9 ler mais ignora ele
+                    p.WriteInt32(0);                             // Unknown valor - JP S9 ler mais ignora ele
+                    p.WriteStr("Luizin");
+                    p.WriteUInt16(0);
+                    return p.GetBytes;
+                }
             }
         }
 

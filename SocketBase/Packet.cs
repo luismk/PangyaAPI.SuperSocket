@@ -1,23 +1,25 @@
-﻿using PangyaAPI.SuperSocket.CRYPTS;
-using PangyaAPI.SuperSocket.Ext;
+﻿using PangyaAPI.Player.Data;
+using PangyaAPI.SuperSocket.Cryptor;
+using PangyaAPI.Utilities;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
     public class Packet : AppPacketBase
     {
-        public Packet(byte[] message, bool IsClient = false) : base(message, IsClient)
+        public Packet()
+        {
+
+        }
+        public Packet(ushort ID) : base(ID)
         {
         }
 
-        public Packet(byte key, byte[] message, bool IsClient = false) : base(key, message, IsClient)
+        public void ReadObject(object @value)
         {
+            ReadPlain(value);
         }
     }
     //public class ConversionByte
@@ -61,53 +63,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
     //// Other classes and code
 
-    //[StructLayout(LayoutKind.Sequential, Pack = 1)]
-    //public struct PacketHead
-    //{
-    //    public short Size;
-    //    public byte LowKey;
-    //    public byte Seq;
-    //    public byte[] RawBytes
-    //    {
-    //        get
-    //        {
-    //            byte[] bytes = new byte[Marshal.SizeOf(typeof(PacketHead))];
 
-    //            bytes[0] = (byte)(Size >> 8);
-    //            bytes[1] = (byte)(Size & 0xFF);
-    //            bytes[2] = LowKey;
-    //            bytes[3] = Seq;
-
-    //            return bytes;
-    //        }
-    //    }
-    //}
-
-    //[StructLayout(LayoutKind.Sequential, Pack = 1)]
-    //public struct PacketHeadClient
-    //{
-    //    public short Size;
-    //    public byte LowKey;
-    //    public byte Seq;
-    //    public byte[] RawBytes
-    //    {
-    //        get
-    //        {
-    //            byte[] bytes = new byte[Marshal.SizeOf(typeof(PacketHeadClient))];
-
-    //            // Use a BinaryWriter to write the structure fields into the byte array
-    //            using (MemoryStream stream = new MemoryStream(bytes))
-    //            using (BinaryWriter writer = new BinaryWriter(stream))
-    //            {
-    //                writer.Write(Size);
-    //                writer.Write(LowKey);
-    //                writer.Write(Seq);
-    //            }
-
-    //            return bytes;
-    //        }
-    //    }
-    //}
     //public class Packet
     //{
     //    private const int CHUNCK_ALLOC = 1024;
@@ -117,129 +73,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
     //    private const uint CB_SEQ_INVERTIDA = 2;
     //    private const uint CB_PARAM_DEFAULT = 0;
 
-    //    private class ConversionByte
-    //    {
-    //        [StructLayout(LayoutKind.Explicit)]
-    //        private class U
-    //        {
-    //            public U(uint _byte)
-    //            {
-    //                dwConvertido = _byte;
-    //            }
-    //            [FieldOffset(0)]
-    //            public uint dwConvertido;
-    //            [FieldOffset(0)]
-    //            public StConvertido _flag;
-    //            public class StConvertido
-    //            {
-    //                public byte a;
-    //                public byte b;
-    //                public byte c;
-    //                public byte d;
-    //            }
-    //        }
-
-    //        private U unionConvertido;
-    //        private byte m_flag;
-
-    //        public ConversionByte(uint _dwConvertido, byte _flag = 0)
-    //        {
-    //            unionConvertido = new U(_dwConvertido);
-    //            m_flag = _flag;
-    //            if (m_flag != CB_PARAM_DEFAULT)
-    //                Invert();
-    //        }
-
-    //        public ConversionByte(byte[] _ucpConvertido, byte _flag = 0)
-    //        {
-    //            unionConvertido = new U(0);
-    //            m_flag = _flag;
-
-    //            if (_ucpConvertido != null)
-    //            {
-    //                unionConvertido.dwConvertido = BitConverter.ToUInt32(_ucpConvertido, 0);
-    //                if (m_flag != CB_PARAM_DEFAULT)
-    //                    Invert();
-    //            }
-    //        }
-
-    //        private void Invert()
-    //        {
-    //            if ((m_flag & CB_BASE_255) != 0)
-    //            {
-    //                unionConvertido.dwConvertido = GetNumberIS();
-    //                unionConvertido.dwConvertido = GetNumberBase256();
-    //            }
-    //            else
-    //            {
-    //                unionConvertido.dwConvertido = GetNumberBase255();
-    //                unionConvertido.dwConvertido = GetNumberIS();
-    //            }
-    //        }
-
-    //        public uint GetNumberNS() // Normal Sequência
-    //        {
-    //            return unionConvertido.dwConvertido;
-    //        }
-
-    //        public uint GetNumberIS() // Inverse Sequência
-    //        {
-    //            uint ulNumber = 0;
-
-    //            ulNumber = unionConvertido._flag.d;
-    //            ulNumber |= (uint)(unionConvertido._flag.c << 8);
-    //            ulNumber |= (uint)(unionConvertido._flag.b << 16);
-    //            ulNumber |= (uint)(unionConvertido._flag.a << 24);
-
-    //            return ulNumber;
-    //        }
-
-    //        private uint ulNumber_temp;
-
-    //        public byte[] GetLPUCNS()
-    //        {
-    //            ulNumber_temp = GetNumberNS();
-    //            return BitConverter.GetBytes(ulNumber_temp);
-    //        }
-
-    //        public byte[] GetLPUCIS()
-    //        {
-    //            ulNumber_temp = GetNumberIS();
-    //            return BitConverter.GetBytes(ulNumber_temp);
-    //        }
-
-    //        public uint GetNumberBase256()
-    //        {
-    //            return GetNumberNS() * 255 / 256 + 1;
-    //        }
-
-    //        public uint GetNumberBase255()
-    //        {
-    //            return ((unionConvertido.dwConvertido / 255) << 8) | (unionConvertido.dwConvertido % 255);
-    //        }
-
-    //        public uint GetISNumberBase256()
-    //        {
-    //            return (uint)(unionConvertido.dwConvertido * 255L / 256 + 1);
-    //        }
-
-    //        public uint GetISNumberBase255()
-    //        {
-    //            return ((GetNumberIS() / 255) << 8) | (GetNumberIS() % 255);
-    //        }
-
-    //        public int PutNumberBuffer(ref byte[] buffer)
-    //        {
-    //            if (buffer == null)
-    //                return -1;
-
-    //            int sz_union = Marshal.SizeOf(unionConvertido);
-
-    //            Buffer.BlockCopy(BitConverter.GetBytes(unionConvertido.dwConvertido), 0, buffer, 0, sz_union);
-
-    //            return sz_union;
-    //        }
-    //    }
+   
     //    public class OffsetIndex
     //    {
     //        public byte[] Buffer;
@@ -656,144 +490,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
     //    //    AddPlain(compressedData, compressedSize);
     //    //}
 
-    //    public void UnMakeFull(byte _key)
-    //    {
-    //        int index = 0;
-    //        PacketHead ph = new PacketHead();
 
-    //        if (mMaked.Buffer == null)
-    //            throw new Exception("Error buf is null in packet.UnMakeFull()");
-
-    //        Buffer.BlockCopy(mMaked.Buffer, index, ph.RawBytes, 0, Marshal.SizeOf(ph));
-    //        index += Marshal.SizeOf(ph);
-
-    //        if (ph.Size > mMaked.IndexW)
-    //            throw new Exception("Error: Unknown Packet. packet.UnMakeFull()");
-
-    //        if (ph.LowKey == 0 && mMaked.Buffer[index] == 0)
-    //        {
-    //            UnmakeRaw();
-    //            ReadWord(out mTipo);
-    //            mPlain.ResetRead();
-
-    //            switch (mTipo)
-    //            {
-    //                case 0:
-    //                    if (ph.Size == 0x0B && mMaked.Buffer[index + 4] == 0 && mMaked.Buffer[index + 5] == 0 && mMaked.Buffer[index + 6] == 0)
-    //                        return;
-    //                    else
-    //                        mPlain.ResetWrite();
-    //                    break;
-    //                case 0x2E:
-    //                case 0x3F:
-    //                case 0x1388:
-    //                    return;
-    //                default:
-    //                    mPlain.ResetWrite();
-    //                    break;
-    //            }
-    //        }
-
-    //        using (Crypt _crypt = new Crypt())
-    //        {
-    //            _crypt.InitKey(_key, ph.LowKey);
-    //            byte[] decrypt = new byte[ph.Size];
-
-    //            try
-    //            {
-    //                _crypt.Decrypt(mMaked.Buffer, ph.Size, decrypt);
-    //            }
-    //            catch (Exception e)
-    //            {
-    //                if (decrypt != null)
-    //                    Array.Clear(decrypt, 0, decrypt.Length);
-
-    //                throw;
-    //            }
-
-    //            mPlain.Reset();
-    //            AddPlain(decrypt, 1, ph.Size - 1);
-
-    //            Array.Clear(decrypt, 0, decrypt.Length);
-    //        }
-    //    }
-
-    //    public void Make(byte _key)
-    //    {
-    //        if (mPlain.IndexW <= 0)
-    //            throw new Exception("Buffer is zero, not enough size for a packet. packet.Make()");
-
-    //        using (Crypt _crypt = new Crypt())
-    //        {
-    //            PacketHeadClient phc = new PacketHeadClient();
-
-    //            byte[] tmp = new byte[mPlain.IndexW + 1];
-    //            int phcSize = Marshal.SizeOf(phc);
-
-    //            Random rand = new Random((int)DateTime.UtcNow.Ticks * 7 * mPlain.IndexW);
-    //            phc.Size = (short)(mPlain.IndexW + 1);
-    //            phc.LowKey = (byte)(rand.Next() & 255);
-    //            phc.Seq = 0;
-
-    //            Buffer.BlockCopy(mPlain.Buffer, 0, tmp, 1, mPlain.IndexW);
-    //            tmp[0] = _crypt.InitKey(_key, phc.LowKey);
-
-    //            byte[] encryptedTmp = new byte[phc.Size];
-
-    //            try
-    //            {
-    //                _crypt.Encrypt(tmp, phc.Size, encryptedTmp);
-    //            }
-    //            catch (Exception e)
-    //            {
-    //                Array.Clear(encryptedTmp, 0, encryptedTmp.Length);
-    //                throw;
-    //            }
-
-    //            mMaked.Reset();
-    //            AddMaked(phc.RawBytes, 0, phcSize);
-    //            AddMaked(encryptedTmp, 0, phc.Size);
-
-    //            Array.Clear(tmp, 0, tmp.Length);
-    //            Array.Clear(encryptedTmp, 0, encryptedTmp.Length);
-    //        }
-    //    }
-
-    //    public void MakeRaw()
-    //    {
-    //        PacketHead ph = new PacketHead();
-
-    //        if (mPlain.Buffer == null)
-    //            throw new Exception("Error buf is null in packet.MakeRaw()");
-
-    //        ph.LowKey = 0; // low part of key random - 0 nesse pacote porque ele é o primiero que passa a chave
-    //        ph.Size = (short)(mPlain.IndexW + 1);
-
-    //        mMaked.Reset();
-    //        AddMaked(ph.RawBytes, 0, Marshal.SizeOf(4));
-    //        AddMaked(new byte[] { 0 }, 0, 1);
-    //        AddMaked(mPlain.Buffer, 0, mPlain.IndexW);
-    //    }
-
-    //    public void UnmakeRaw()
-    //    {
-    //        int index = 0;
-    //        PacketHead ph = new PacketHead();
-
-    //        if (mMaked.Buffer == null)
-    //            throw new Exception("Error buf is null in packet.UnmakeRaw()");
-
-    //        Buffer.BlockCopy(mMaked.Buffer, index, ph.RawBytes, 0, Marshal.SizeOf(ph));
-    //        index += Marshal.SizeOf(ph);
-
-    //        if (ph.Size > mMaked.IndexW)
-    //            throw new Exception("Error: Unknown Packet. packet.UnmakeRaw()");
-
-    //        index++; // Skip the byte with value zero
-
-    //        mPlain.Reset();
-    //        AddPlain(mMaked.Buffer, index, ph.Size - 1);
-    //    }
     //    private void AddPlain(byte[] buf, int index, int size)
     //    {
     //        if (buf == null)

@@ -7,6 +7,8 @@ using System.Threading;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using _smp = PangyaAPI.Utilities.Log;
+using PangyaAPI.Utilities.BinaryModels;
 
 namespace PangyaAPI.SuperSocket.SocketBase
 {
@@ -58,7 +60,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         public AppServer(IReceiveFilterFactory<StringRequestInfo> receiveFilterFactory)
             : base(receiveFilterFactory)
         {
-
         }
     }
 
@@ -79,7 +80,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             : base()
         {
             //IFF = new IFFHandle("data//pangya_jp.iff");
-            Ini = new IniHandle("Config//server.ini");
+            Ini = new IniHandle("server.ini");
             m_si = new ServerInfoEx();
         }
 
@@ -87,7 +88,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
            : base()
         {
             //IFF = new IFFHandle("data//pangya_jp.iff");
-            Ini = new IniHandle("Config//server.ini");
+            Ini = new IniHandle("server.ini");
             m_si = new ServerInfoEx();
         }
 
@@ -111,7 +112,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             : base(protocol)
         {
             //IFF = new IFFHandle("data//pangya_jp.iff");
-            Ini = new IniHandle("Config//server.ini");
+            Ini = new IniHandle("server.ini");
             m_si = new ServerInfoEx();
         }
 
@@ -139,6 +140,8 @@ namespace PangyaAPI.SuperSocket.SocketBase
             var t2 = new Thread(new ThreadStart(AppMonitor));
             t2.Start();
 
+           // CheckSessionLive();
+
             return true;
         }
 
@@ -155,18 +158,35 @@ namespace PangyaAPI.SuperSocket.SocketBase
             if (m_SessionDict.TryAdd(sessionID, appSession))
                 return true;
 
-            //if (Logger.IsErrorEnabled)
-            //    Logger.Error(appSession, "The session is refused because the it's ID already exists!");
+            _smp.Message_Pool.push("The session is refused because the it's ID already exists!");
 
             return false;
         }
-
+        /// <summary>
+        /// chama a configuração do servidor
+        /// </summary>
+        public virtual void ConfigInit()
+        {
+            m_si = new ServerInfoEx
+            {
+                Version = Ini.ReadString("SERVERINFO", "VERSION", "Pangya Server Csharp 1.0"),
+                Version_Client = Ini.ReadString("SERVERINFO", "CLIENTVERSION", "JP.R7.962.00"),
+                Name = Ini.ReadString("SERVERINFO", "NAME", "Pangya Server Csharp"),
+                UID = Ini.ReadInt32("SERVERINFO", "GUID", 10103),
+                Port = Ini.ReadInt32("SERVERINFO", "PORT", 10103),
+                IP = Ini.ReadString("SERVERINFO", "IP", "127.0.0.1"),
+                MaxUser = Ini.ReadInt32("SERVERINFO", "MAXUSER", 2001),
+                Property = new uPropertyEx(Ini.ReadUInt32("SERVERINFO", "PROPERTY", 2048)),
+                Auth_IP = Ini.ReadString("AUTHSERVER", "IP", "127.0.0.1"),
+                Auth_Port = Ini.ReadUInt32("AUTHSERVER", "PORT", 7997),
+                Rate = new RateConfigInfo()
+            };
+        }
         /// <summary>
         /// Gets the app session by ID.
         /// </summary>
         /// <param name="sessionID">The session ID.</param>
         /// <returns></returns>
-        [Obsolete("Use the method GetSessionByID instead")]
         public TAppSession GetAppSessionByID(uint sessionID)
         {
             return GetSessionByID(sessionID);
@@ -187,6 +207,104 @@ namespace PangyaAPI.SuperSocket.SocketBase
             return targetSession;
         }
 
+        public override IAppSession GetSessionByNick(string Nick)
+        {
+            if (string.IsNullOrEmpty(Nick))
+                return NullAppSession;
+
+            foreach (var session in m_SessionDict.Values)
+            {
+                if (session.GetNickname() == Nick)
+                {
+                    return session;
+                }
+            }
+
+            return NullAppSession;
+        }
+
+        public override IAppSession GetSessionByUserName(string ID)
+        {
+            if (string.IsNullOrEmpty(ID))
+                return NullAppSession;
+
+            foreach (var session in m_SessionDict.Values)
+            {
+                if (session.GetID() == ID)
+                {
+                    return session;
+                }
+            }
+
+            return NullAppSession;
+        }
+        public void Send(TAppSession session, Packet packet)
+        {
+            session.Send(packet);
+        }
+
+        public void Send(TAppSession session, byte[] packet)
+        {
+            session.Send(packet);
+        }
+        public void SendToAll(Packet packet)
+        {
+            foreach (var session in m_SessionDict.Values)
+            {
+                session.Send(packet);
+            }
+        }
+
+        public void SendToAll(byte[] packet)
+        {
+            foreach (var session in m_SessionDict.Values)
+            {
+                session.Send(packet);
+            }
+        }
+        #region Comandos no console
+        public void ServerMessage(string message)
+        {
+            var response = new PangyaBinaryWriter();
+
+            response.Write(new byte[] { 0x43, 0x00 });
+            response.WritePStr(message);
+
+            SendToAll(response.GetBytes);
+
+            Console.WriteLine("Mensagem enviada com sucesso");
+        }
+
+
+        public void TickerMessage(string message)
+        {
+            var response = new PangyaBinaryWriter();
+
+            response.Write(new byte[] { 0xC9, 0x00 });
+            response.WritePStr("@Admin");
+            response.WritePStr(message);
+            response.WriteZero(1);
+
+            SendToAll(response.GetBytes);
+
+            Console.WriteLine("Ticker enviado com sucesso");
+        }
+
+
+
+
+        public void BroadMessage(string message)
+        {
+            var response = new PangyaBinaryWriter();
+
+            response.Write(new byte[] { 0x42, 0x00 });
+            response.WritePStr("Aviso: " + message);
+
+            SendToAll(response.GetBytes);
+            Console.WriteLine("BroadCast enviado com sucesso");
+        }
+        #endregion
+
         /// <summary>
         /// Called when [socket session closed].
         /// </summary>
@@ -202,13 +320,13 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 if (!m_SessionDict.TryRemove(sessionID, out removedSession))
                 {
                 //    if (Logger.IsErrorEnabled)
-                //        Logger.Error(session, "Failed to remove this session, Because it has't been in session container!");
+                _smp.Message_Pool.push("Failed to remove this session, Because it has't been in session container!");
                 }
             }
 
             base.OnSessionClosed(session, reason);
         }
-
+      
         /// <summary>
         /// Gets the total session count.
         /// </summary>
@@ -250,18 +368,16 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
                     var timeOutSessions = sessionSource.Where(s => s.Value.LastActiveTime <= timeOut).Select(s => s.Value);
 
-                    System.Threading.Tasks.Parallel.ForEach(timeOutSessions, s =>
+                    Parallel.ForEach(timeOutSessions, s =>
                     {
-                        //if (Logger.IsInfoEnabled)
-                        //    Logger.Info(s, string.Format("The session will be closed for {0} timeout, the session start time: {1}, last active time: {2}!", now.Subtract(s.LastActiveTime).TotalSeconds, s.StartTime, s.LastActiveTime));
+                        _smp.Message_Pool.push(string.Format("The session will be closed for {0} timeout, the session start time: {1}, last active time: {2}!", now.Subtract(s.LastActiveTime).TotalSeconds, s.StartTime, s.LastActiveTime));
                         
                         s.Close(CloseReason.TimeOut);
                     });
                 }
                 catch (Exception e)
                 {
-                    //if (Logger.IsErrorEnabled)
-                    //    Logger.Error("Clear idle session error!", e);
+                    _smp.Message_Pool.push("Clear idle session error!", e);
                 }
                 finally
                 {
@@ -288,6 +404,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         private System.Threading.Timer m_SessionSnapshotTimer = null;
 
         private KeyValuePair<uint, TAppSession>[] m_SessionsSnapshot = new KeyValuePair<uint, TAppSession>[0];
+        private List<TAppSession> m_sessionsDel = new List<TAppSession>();
 
         private void StartSessionSnapshotTimer()
         {

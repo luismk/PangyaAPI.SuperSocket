@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using PangyaAPI.Player.Data;
 using PangyaAPI.SuperSocket.Engine;
+using PangyaAPI.SuperSocket.Ext;
 using PangyaAPI.SuperSocket.Interface;
 using PangyaAPI.Utilities;
 using _smp = PangyaAPI.Utilities.Log;
@@ -52,13 +53,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 return (ServerState)m_StateCode;
             }
         }
-
-        // public IFFHandle IFF { get; set; }
-        public bool IFFLog { get; set; }
         public IniHandle Ini { get; set; }
         public ServerInfoEx m_si { get; set; }
         public List<TableMac> ListBlockMac { get; set; }
-
         /// <summary>
         /// Gets or sets the receive filter factory.
         /// </summary>
@@ -81,12 +78,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             get { return this.m_SocketServer.SendingQueuePool; }
         }
-        private ISocketServerFactory m_SocketServerFactory;
-
-
         private static bool m_ThreadPoolConfigured = false;
 
-        private List<Interface.IConnectionFilter> m_ConnectionFilters;
+        private List<IConnectionFilter> m_ConnectionFilters;
 
         private long m_TotalHandledRequests = 0;
 
@@ -100,6 +94,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         private ListenerInfo[] m_Listeners;
 
+        public uint NextConnectionID { get; set; } = 0;
         /// <summary>
         /// Gets or sets the listeners inforamtion.
         /// </summary>
@@ -120,15 +115,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         public DateTime StartedTime { get; private set; }
 
         public bool IsRunning { get => m_StateCode == ServerStateConst.Running; }
-
-        ///// <summary>
-        ///// Gets or sets the log factory.
-        ///// </summary>
-        ///// <value>
-        ///// The log factory.
-        ///// </value>
-        //public ILogFactory LogFactory { get; private set; }
-
 
         /// <summary>
         /// Gets the default text encoding.
@@ -166,6 +152,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         public AppServerBase(IReceiveFilterFactory<TRequestInfo> receiveFilterFactory)
         {
             this.ReceiveFilterFactory = receiveFilterFactory;
+            this.m_ConnectionFilters = new List<IConnectionFilter>(); 
         }
 
         /// <summary>
@@ -181,7 +168,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         partial void SetDefaultCulture(IRootConfig rootConfig, IServerConfig config);
 
-        private void SetupBasic(IRootConfig rootConfig, IServerConfig config, ISocketServerFactory socketServerFactory)
+        private void SetupBasic(IRootConfig rootConfig, IServerConfig config)
         {
 
             if (config == null)
@@ -198,33 +185,21 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             if (!m_ThreadPoolConfigured)
             {
-                //if (!TheadPoolEx.ResetThreadPool(rootConfig.MaxWorkingThreads >= 0 ? rootConfig.MaxWorkingThreads : new Nullable<int>(),
-                //        rootConfig.MaxCompletionPortThreads >= 0 ? rootConfig.MaxCompletionPortThreads : new Nullable<int>(),
-                //        rootConfig.MinWorkingThreads >= 0 ? rootConfig.MinWorkingThreads : new Nullable<int>(),
-                //        rootConfig.MinCompletionPortThreads >= 0 ? rootConfig.MinCompletionPortThreads : new Nullable<int>()))
-                //{
-                //    throw new Exception("Failed to configure thread pool!");
-                //}
+                if (!TheadPoolEx.ResetThreadPool(rootConfig.MaxWorkingThreads >= 0 ? rootConfig.MaxWorkingThreads : new int?(),
+                        rootConfig.MaxCompletionPortThreads >= 0 ? rootConfig.MaxCompletionPortThreads : new int?(),
+                        rootConfig.MinWorkingThreads >= 0 ? rootConfig.MinWorkingThreads : new int?(),
+                        rootConfig.MinCompletionPortThreads >= 0 ? rootConfig.MinCompletionPortThreads : new int?()))
+                {
+                    throw new Exception("Failed to configure thread pool!");
+                }
 
                 m_ThreadPoolConfigured = true;
             }
 
-            if (socketServerFactory == null && Listeners == null)
+            m_Listeners = new ListenerInfo[]
             {
-                m_Listeners = new ListenerInfo[]
-                {
-    new ListenerInfo
-    {
-        BackLog = m_si.MaxUser,
-        EndPoint = new IPEndPoint(ParseIPAddress(m_si.IP), m_si.Port)
-    }
-                };
-
-                socketServerFactory = new SocketServerFactory();
-            }
-
-            m_SocketServerFactory = socketServerFactory;
-
+                new ListenerInfo( m_si.MaxUser,new IPEndPoint(ParseIPAddress(m_si.IP), m_si.Port))
+            };
             TextEncoding = new ASCIIEncoding();
         }
 
@@ -245,10 +220,8 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         private bool SetupAdvanced(IServerConfig config)
         {
-
             if (!SetupListeners(config))
                 return false;
-
 
             return true;
         }
@@ -260,21 +233,19 @@ namespace PangyaAPI.SuperSocket.SocketBase
             //Check receiveFilterFactory
             if (ReceiveFilterFactory == null)
             {
-                ReceiveFilterFactory = CreateDefaultReceiveFilterFactory();//aqui pode ser um problema @!
+                ReceiveFilterFactory = CreateDefaultReceiveFilterFactory();//aqui pode ser um problema @! [RESOLVIDO]
 
                 if (ReceiveFilterFactory == null)
                 {
                     _smp.Message_Pool.push("receiveFilterFactory is required!");
-
                     return false;
                 }
             }
 
-            var plainConfig = Config as ServerConfig;
+            ServerConfig plainConfig = Config as ServerConfig;
 
             if (plainConfig == null)
             {
-                //Using plain config model instead of .NET configuration element to improve performance
                 plainConfig = new ServerConfig(Config);
 
                 if (string.IsNullOrEmpty(plainConfig.Name))
@@ -283,21 +254,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 Config = plainConfig;
             }
 
-            try
-            {
-                m_ServerStatus = new StatusInfoCollection();
-                m_ServerStatus.Name = Name;
-                m_ServerStatus.Tag = Name;
-                m_ServerStatus[StatusInfoKeys.MaxConnectionNumber] = Config.MaxConnectionNumber;
-                m_ServerStatus[StatusInfoKeys.Listeners] = m_Listeners;
-            }
-            catch (Exception e)
-            {
-                //if (//Logger.IsErrorEnabled)
-                _smp.Message_Pool.push("Failed to create ServerSummary instance!", e, _smp.type_msg.CL_ONLY_CONSOLE);
-
-                return false;
-            }
 
             return SetupSocketServer();
         }
@@ -307,9 +263,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="port">The port.</param>
         /// <returns>return setup result</returns>
-        public bool Setup(int port)
+        public bool Setup(int port, string _name)
         {
-            return Setup("Any", port);
+            return Setup("Any", port, _name);
         }
 
         private void TrySetInitializedState()
@@ -331,9 +287,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="connectionFilters">The connection filters.</param>
         /// <param name="commandLoaders">The command loaders.</param>
         /// <returns></returns>
-        public bool Setup(IServerConfig config, ISocketServerFactory socketServerFactory = null, IReceiveFilterFactory<TRequestInfo> receiveFilterFactory = null, IEnumerable<IConnectionFilter> connectionFilters = null)
+        public bool Setup(IServerConfig config, IReceiveFilterFactory<TRequestInfo> receiveFilterFactory = null, IEnumerable<IConnectionFilter> connectionFilters = null)
         {
-            return Setup(new SocketBase.RootConfig(), config, socketServerFactory, receiveFilterFactory, connectionFilters);
+            return Setup(new RootConfig(), config, receiveFilterFactory, connectionFilters);
         }
 
         /// <summary>
@@ -347,13 +303,11 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="connectionFilters">The connection filters.</param>
         /// <param name="commandLoaders">The command loaders.</param>
         /// <returns></returns>
-        public bool Setup(IRootConfig rootConfig, IServerConfig config, ISocketServerFactory socketServerFactory = null, IReceiveFilterFactory<TRequestInfo> receiveFilterFactory = null, IEnumerable<IConnectionFilter> connectionFilters = null)
+        public bool Setup(IRootConfig rootConfig, IServerConfig config, IReceiveFilterFactory<TRequestInfo> receiveFilterFactory = null, IEnumerable<IConnectionFilter> connectionFilters = null)
         {
             TrySetInitializedState();
 
-            SetupBasic(rootConfig, config, socketServerFactory);
-
-
+            SetupBasic(rootConfig, config);
 
             if (!SetupMedium(receiveFilterFactory, connectionFilters))
                 return false;
@@ -382,68 +336,16 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="connectionFilters">The connection filters.</param>
         /// <param name="commandLoaders">The command loaders.</param>
         /// <returns>return setup result</returns>
-        public bool Setup(string ip, int port, ISocketServerFactory socketServerFactory = null, IReceiveFilterFactory<TRequestInfo> receiveFilterFactory = null, IEnumerable<IConnectionFilter> connectionFilters = null)
+        public bool Setup(string ip, int port, string _name, IReceiveFilterFactory<TRequestInfo> receiveFilterFactory = null, IEnumerable<IConnectionFilter> connectionFilters = null)
         {
-            return Setup(new ServerConfig
+            m_Name = _name;
+            if (connectionFilters == null)
             {
-                Ip = ip,
-                Port = port
-            },
-                          socketServerFactory,
-                          receiveFilterFactory,
-                          connectionFilters);
-        }
-
-        private TProvider GetSingleProviderInstance<TProvider>(ProviderFactoryInfo[] factories, ProviderKey key)
-        {
-            var factory = factories.FirstOrDefault(p => p.Key.Name == key.Name);
-
-            if (factory == null)
-                return default(TProvider);
-
-            return factory.ExportFactory.CreateExport<TProvider>();
-        }
-
-        private bool TryGetProviderInstances<TProvider>(ProviderFactoryInfo[] factories, ProviderKey key, Func<Type, object> creator, Func<TProvider, ProviderFactoryInfo, bool> initializer, out IEnumerable<TProvider> providers)
-            where TProvider : class
-        {
-            IEnumerable<ProviderFactoryInfo> selectedFactories = factories.Where(p => p.Key.Name == key.Name);
-
-            if (!selectedFactories.Any())
-            {
-                providers = null;
-                return true;
+                var connectionFilter = new ConnectionFilter();
+                connectionFilter.Initialize(Name, this);
+                connectionFilters = new List<ConnectionFilter>() { connectionFilter };
             }
-
-            providers = new List<TProvider>();
-
-            var list = (List<TProvider>)providers;
-
-            foreach (var f in selectedFactories)
-            {
-                var provider = creator == null ? f.ExportFactory.CreateExport<TProvider>() : f.ExportFactory.CreateExport<TProvider>(creator);
-
-                if (!initializer(provider, f))
-                    return false;
-
-                list.Add(provider);
-            }
-
-            return true;
-        }
-
-        private IEnumerable<TProvider> GetProviderInstances<TProvider>(ProviderFactoryInfo[] factories, ProviderKey key)
-            where TProvider : class
-        {
-            return GetProviderInstances<TProvider>(factories, key, null);
-        }
-
-        private IEnumerable<TProvider> GetProviderInstances<TProvider>(ProviderFactoryInfo[] factories, ProviderKey key, Func<Type, object> creator)
-            where TProvider : class
-        {
-            IEnumerable<TProvider> providers;
-            TryGetProviderInstances<TProvider>(factories, key, creator, (p, f) => true, out providers);
-            return providers;
+            return Setup(new ServerConfig { Ip = ip, Port = port, Name = _name }, receiveFilterFactory, connectionFilters);
         }
 
         /// <summary>
@@ -499,7 +401,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                     //Port is not configured, but ip is configured
                     if (!string.IsNullOrEmpty(config.Ip))
                     {
-                        //if (//Logger.IsErrorEnabled)
+
                         _smp.Message_Pool.push("Port is required in config!");
 
                         return false;
@@ -513,7 +415,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                     //We don't allow this case
                     if (listeners.Any())
                     {
-                        //if (//Logger.IsErrorEnabled)
+
                         _smp.Message_Pool.push("If you configured Ip and Port in server node, you cannot defined listener in listeners node any more!");
 
                         return false;
@@ -523,7 +425,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
                 if (!listeners.Any())
                 {
-                    //if (//Logger.IsErrorEnabled)
+
                     _smp.Message_Pool.push("No listener defined!");
 
                     return false;
@@ -535,7 +437,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
             catch (Exception e)
             {
-                //if (//Logger.IsErrorEnabled)
+
                 _smp.Message_Pool.push(e);
 
                 return false;
@@ -578,8 +480,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 if (origStateCode < ServerStateConst.NotStarted)
                     throw new Exception("You cannot start a server instance which has not been setup yet.");
 
-                //if (//Logger.IsErrorEnabled)
-                //Logger.ErrorFormat("This server instance is in the state {0}, you cannot start it now.", (ServerState)origStateCode);
+                _smp.Message_Pool.push(string.Format("This server instance is in the state {0}, you cannot start it now.", (ServerState)origStateCode));
 
                 return false;
             }
@@ -592,30 +493,19 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             StartedTime = DateTime.Now;
             m_StateCode = ServerStateConst.Running;
-
-            m_ServerStatus[StatusInfoKeys.IsRunning] = true;
-            m_ServerStatus[StatusInfoKeys.StartedTime] = StartedTime;
-
             try
             {
-                //Will be removed in the next version
-#pragma warning disable 0612, 618
                 OnStartup();
-#pragma warning restore 0612, 618
-
                 OnStarted();
             }
             catch (Exception e)
             {
-                //if (//Logger.IsErrorEnabled)
-                //{
-                _smp.Message_Pool.push("One exception wa thrown in the method 'OnStartup()'.", e);
-                //}
+                _smp.Message_Pool.push("[AppServer::Start()][LogException]: One exception wa thrown in the method 'OnStartup()'.", e);
             }
             finally
             {
-                //if (//Logger.IsInfoEnabled)
-                //Logger.Info(string.Format("The server instance {0} has been started!", Name));
+
+                _smp.Message_Pool.push(string.Format("[AppServer::Start()][Log]: The server instance {0} has been started!", Name));
             }
 
             return true;
@@ -624,7 +514,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <summary>
         /// Called when [startup].
         /// </summary>
-        [Obsolete("Use OnStarted() instead")]
         protected virtual void OnStartup()
         {
             _smp.Message_Pool.push("[AppServer.OnStartup][Log]: Server starting...", _smp.type_msg.CL_ONLY_CONSOLE);
@@ -643,7 +532,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         protected virtual void OnStopped()
         {
-
+            _smp.Message_Pool.push("[AppServer.OnStopped][Log]: Server Stopped Mode: " + m_si.Port, _smp.type_msg.CL_ONLY_CONSOLE);
         }
 
         /// <summary>
@@ -663,11 +552,8 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             OnStopped();
 
-            m_ServerStatus[StatusInfoKeys.IsRunning] = false;
-            m_ServerStatus[StatusInfoKeys.StartedTime] = null;
 
-            //if (//Logger.IsInfoEnabled)
-            //Logger.Info(string.Format("The server instance {0} has been stopped!", Name));
+            _smp.Message_Pool.push(string.Format("The server instance {0} has been stopped!", Name));
         }
 
         private Func<TAppSession, byte[], int, int, bool> m_RawDataReceivedHandler;
@@ -721,7 +607,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="requestInfo">The request info.</param>
         internal void ExecuteCommand(IAppSession session, TRequestInfo requestInfo)
         {
-            this.ExecuteCommand((TAppSession)session, requestInfo);
+            this.ExecuteRequest((TAppSession)session, requestInfo);
         }
 
 
@@ -731,26 +617,30 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="session">The session.</param>
         /// <param name="requestInfo">The request info.</param>
-        protected virtual void ExecuteCommand(TAppSession session, TRequestInfo requestInfo)
+        protected virtual void ExecuteRequest(TAppSession session, TRequestInfo requestInfo)
         {
             if (m_RequestHandler != null)
             {
                 try
                 {
+                    var newRequest = (requestInfo as PangyaRequestInfo);
+                    //var packet = new Packet(newRequest.Message);
+                    //packet.unMake(session.m_key);
+                    //newRequest.Message = packet.Message;
                     //chama novos pacotes/call new packets
-                    m_RequestHandler(session, requestInfo);
+                    m_RequestHandler(session, newRequest as TRequestInfo);
                 }
                 catch (Exception e)
                 {
                     session.InternalHandleExcetion(e);
                 }
 
-                session.LastActiveTime = DateTime.Now;
+                session.LastActiveTime = DateTime.Now.AddSeconds(10);
                 Interlocked.Increment(ref m_TotalHandledRequests);
             }
             else
             {
-                session.LastActiveTime = DateTime.Now;
+                session.LastActiveTime = DateTime.Now.AddDays(-1);
                 session.InternalHandleUnknownRequest(requestInfo);
             }
         }
@@ -761,9 +651,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         /// <param name="session">The session.</param>
         /// <param name="requestInfo">The request info.</param>
-        void IRequestHandler<TRequestInfo>.ExecuteCommand(IAppSession session, TRequestInfo requestInfo)
+        void IRequestHandler<TRequestInfo>.HandleRequest(IAppSession session, TRequestInfo requestInfo)
         {
-            this.ExecuteCommand((TAppSession)session, requestInfo);
+            this.ExecuteRequest((TAppSession)session, requestInfo);
         }
 
         /// <summary>
@@ -789,15 +679,13 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             for (var i = 0; i < m_ConnectionFilters.Count; i++)
             {
-                var currentFilter = m_ConnectionFilters[i];
+                var currentFilter = (ConnectionFilter)m_ConnectionFilters[i];
                 if (!currentFilter.AllowConnect(remoteAddress))
                 {
-                    //if (//Logger.IsInfoEnabled)
-                    //Logger.InfoFormat("A connection from {0} has been refused by filter {1}!", remoteAddress, currentFilter.Name);
+                    _smp.Message_Pool.push(string.Format("A connection from {0} has been refused by filter {1}!", remoteAddress, currentFilter.Name));
                     return false;
                 }
             }
-
             return true;
         }
 
@@ -809,12 +697,14 @@ namespace PangyaAPI.SuperSocket.SocketBase
         IAppSession IAppServer.CreateAppSession(ISocketSession socketSession)
         {
             if (!ExecuteConnectionFilters(socketSession.RemoteEndPoint))
+            {
+                socketSession.Close(reason: CloseReason.SocketError);
                 return NullAppSession;
-
+            
+            }
             var appSession = CreateAppSession(socketSession);
-
             appSession.Initialize(this, socketSession);
-
+            NextConnectionID++;
             return appSession;
         }
 
@@ -841,7 +731,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 return false;
 
             appSession.SocketSession.Closed += OnSocketSessionClosed;
-
 
             OnNewSessionConnected(appSession);
             return true;
@@ -913,10 +802,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="reason">The reason.</param>
         private void OnSocketSessionClosed(ISocketSession session, CloseReason reason)
         {
-            //Even if LogBasicSessionActivity is false, we also log the unexpected closing because the close reason probably be useful
-            //if (//Logger.IsInfoEnabled && (Config.LogBasicSessionActivity || (reason != CloseReason.ServerClosing && reason != CloseReason.ClientClosing && reason != CloseReason.ServerShutdown && reason != CloseReason.SocketError)))
-            //Logger.Info(session, string.Format("This session was closed for {0}!", reason));
-
+            #region _RELEASE
+            _smp.Message_Pool.push(string.Format("[AppServer::OnSocketSessionClosed][Log]: This session was closed for {0}!", reason));
+            #endregion
             var appSession = session.AppSession as TAppSession;
             appSession.Connected = false;
             OnSessionClosed(appSession, reason);
@@ -1001,63 +889,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         public abstract int SessionCount { get; }
 
-
-        #region IActiveConnector
-
-
-
-        #endregion ISystemEndPoint
-
-        #region IStatusInfoSource
-
-        private StatusInfoCollection m_ServerStatus;
-
-
-        /// <summary>
-        /// Updates the summary of the server.
-        /// </summary>
-        /// <param name="serverStatus">The server status.</param>
-        protected virtual void UpdateServerStatus(StatusInfoCollection serverStatus)
-        {
-            DateTime now = DateTime.Now;
-
-            serverStatus[StatusInfoKeys.IsRunning] = m_StateCode == ServerStateConst.Running;
-            serverStatus[StatusInfoKeys.TotalConnections] = this.SessionCount;
-
-            var totalHandledRequests0 = serverStatus.GetValue<long>(StatusInfoKeys.TotalHandledRequests, 0);
-
-            var totalHandledRequests = this.TotalHandledRequests;
-
-            serverStatus[StatusInfoKeys.RequestHandlingSpeed] = ((totalHandledRequests - totalHandledRequests0) / now.Subtract(serverStatus.CollectedTime).TotalSeconds);
-            serverStatus[StatusInfoKeys.TotalHandledRequests] = totalHandledRequests;
-
-            if (State == ServerState.Running)
-            {
-                var sendingQueuePool = m_SocketServer.SendingQueuePool;
-                serverStatus[StatusInfoKeys.AvialableSendingQueueItems] = sendingQueuePool.AvialableItemsCount;
-                serverStatus[StatusInfoKeys.TotalSendingQueueItems] = sendingQueuePool.TotalItemsCount;
-            }
-            else
-            {
-                serverStatus[StatusInfoKeys.AvialableSendingQueueItems] = 0;
-                serverStatus[StatusInfoKeys.TotalSendingQueueItems] = 0;
-            }
-
-            serverStatus.CollectedTime = now;
-        }
-
-        /// <summary>
-        /// Called when [server status collected].
-        /// </summary>
-        /// <param name="bootstrapStatus">The bootstrapStatus status.</param>
-        /// <param name="serverStatus">The server status.</param>
-        protected virtual void OnServerStatusCollected(StatusInfoCollection bootstrapStatus, StatusInfoCollection serverStatus)
-        {
-
-        }
-
-        #endregion IStatusInfoSource
-
         #region IDisposable Members
 
         /// <summary>
@@ -1067,23 +898,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             if (m_StateCode == ServerStateConst.Running)
                 Stop();
-        }
-
-        public void TransferSystemMessage(string messageType, object messageData)
-        {
-            throw new NotImplementedException();
-        }
-        StatusInfoAttribute[] IStatusInfoSource.GetServerStatusMetadata()
-        {
-            return null;
-        }
-
-
-        StatusInfoCollection IStatusInfoSource.CollectServerStatus(StatusInfoCollection bootstrapStatus)
-        {
-            UpdateServerStatus(m_ServerStatus);
-            OnServerStatusCollected(bootstrapStatus, m_ServerStatus);
-            return m_ServerStatus;
         }
 
         public abstract void onHeartBeat();
@@ -1134,6 +948,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 catch { }
             }
         }
+
+        public abstract IAppSession GetSessionByUserName(string User);
+        public abstract IAppSession GetSessionByNick(string Nick);
 
 
         #endregion

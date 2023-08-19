@@ -47,8 +47,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CRYPTS\Crypt.cs" />
-    <Compile Include="CRYPTS\CryptOracle.cs" />
+    <Compile Include="Cryptor\Compressor.cs" />
+    <Compile Include="Cryptor\Crypt.cs" />
+    <Compile Include="Cryptor\CryptOracle.cs" />
+    <Compile Include="Cryptor\MiniLzo.cs" />
     <Compile Include="Engine\BufferBaseState.cs" />
     <Compile Include="Engine\BufferManager.cs" />
     <Compile Include="Engine\BufferState.cs" />
@@ -63,9 +65,11 @@
     <Compile Include="Engine\SocketSession.cs" />
     <Compile Include="Engine\SocketSessionClosedEventArgs.cs" />
     <Compile Include="Engine\TcpAsyncSocketListener.cs" />
+    <Compile Include="Ext\AppException.cs" />
     <Compile Include="Ext\BinaryUtil.cs" />
     <Compile Include="Ext\ConfigurationExtension.cs" />
     <Compile Include="Ext\SocketEx.cs" />
+    <Compile Include="Ext\TheadPoolEx.cs" />
     <Compile Include="Ext\Tools.cs" />
     <Compile Include="Interface\IActiveConnector.cs" />
     <Compile Include="Interface\IAppSession.cs" />
@@ -98,6 +102,7 @@
     <Compile Include="Interface\ISocketServer.cs" />
     <Compile Include="Interface\ISocketServerFactory.cs" />
     <Compile Include="Interface\ISocketSession.cs" />
+    <Compile Include="Interface\IsolationMode.cs" />
     <Compile Include="Interface\IStatusInfoSource.cs" />
     <Compile Include="Interface\ISystemEndPoint.cs" />
     <Compile Include="Interface\ITransactionItem.cs" />
@@ -119,6 +124,7 @@
     <Compile Include="SocketBase\CommandLineReceiveFilterFactory.cs" />
     <Compile Include="SocketBase\CommandUpdateEventArgs.cs" />
     <Compile Include="SocketBase\CommandUpdateInfo.cs" />
+    <Compile Include="SocketBase\ConnectionFilter.cs" />
     <Compile Include="SocketBase\DefaultReceiveFilterFactory.cs" />
     <Compile Include="SocketBase\ExportFactory.cs" />
     <Compile Include="SocketBase\FilterState.cs" />

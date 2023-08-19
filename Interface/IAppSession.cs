@@ -18,10 +18,6 @@ namespace PangyaAPI.SuperSocket.Interface
         IAppServer AppServer { get; }
 
         /// <summary>
-        /// Gets the items.
-        /// </summary>
-        IDictionary<object, object> Items { get; }
-        /// <summary>
         /// Gets the local listening endpoint.
         /// </summary>
         IPEndPoint LocalEndPoint { get; }
@@ -66,7 +62,6 @@ namespace PangyaAPI.SuperSocket.Interface
         /// </summary>
         IServerConfig Config { get; }
 
-
         /// <summary>
         /// Gets or sets the charset which is used for transfering text message.
         /// </summary>
@@ -85,20 +80,12 @@ namespace PangyaAPI.SuperSocket.Interface
         /// Starts the session.
         /// </summary>
         void StartSession();
-        //void Send(Packet packet);
-        //void Send(byte[] message);
-        //void Send();
-
-        //void SendResponse(Packet packet);
-        //void SendResponse(byte[] message);
-        //void SendResponse();
-        //void SendCallback(IAsyncResult result);
-        string GetNickname();
-        uint GetUID();
-        string GetID();
 
         void HandleExceptionalError(Exception e);
 
+        string GetNickname();
+        uint GetUID();
+        string GetID();
     }
     /// <summary>
     /// The interface for appSession
@@ -109,8 +96,6 @@ namespace PangyaAPI.SuperSocket.Interface
          where TRequestInfo : IRequestInfo
          where TAppSession : IAppSession, IAppSession<TAppSession, TRequestInfo>, new()
     {
-        void Initialize(IAppServer appServer, Socket client);
         void Initialize(IAppServer<TAppSession, TRequestInfo> server, ISocketSession socketSession);
-
     }
 }

@@ -8,35 +8,39 @@ using PangyaAPI.SuperSocket.Ext;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
-
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.Engine
 {
+    static class SocketState
+    {
+        public const int Normal = 0;//0000 0000
+        public const int InClosing = 16;//0001 0000  >= 16
+        public const int Closed = 16777216;//256 * 256 * 256; 0x01 0x00 0x00 0x00
+        public const int InSending = 1;//0000 0001  > 1
+        public const int InReceiving = 2;//0000 0010 > 2
+        public const int InSendingReceivingMask = -4;// ~(InSending | InReceiving); 0xf0 0xff 0xff 0xff
+    }
+
     /// <summary>
     /// Socket Session, all application session should base on this class
     /// </summary>
-    internal abstract class SocketSession : ISocketSession, ISessionBase
+    abstract class SocketSession : ISocketSession, ISessionBase
     {
-        private const string m_GeneralErrorMessage = "Unexpected error";
-
-        private const string m_GeneralSocketErrorMessage = "Unexpected socket error: {0}";
-
-        private const string m_CallerInformation = "Caller: {0}, file path: {1}, line number: {2}";
-
-        private const int m_CloseReasonMagic = 256;
+        public IAppSession AppSession { get; private set; }
 
         protected readonly object SyncRoot = new object();
 
+        //0x00 0x00 0x00 0x00
+        //1st byte: Closed(Y/N) - 0x01
+        //2nd byte: N/A
+        //3th byte: CloseReason
+        //Last byte: 0000 0000 - normal state
+        //0000 0001: in sending
+        //0000 0010: in receiving
+        //0001 0000: in closing
         private int m_State = 0;
 
-        private ISmartPool<SendingQueue> m_SendingQueuePool;
-
-        private SendingQueue m_SendingQueue;
-
-        private Socket m_Client;
-
-        public IAppSession AppSession { get; private set; }
-
-        protected bool SyncSend { get; private set; }
+        public abstract int OrigReceiveOffset { get; }
 
         /// <summary>
         /// Gets or sets the session ID.
@@ -49,6 +53,49 @@ namespace PangyaAPI.SuperSocket.Engine
         /// </summary>
         /// <value>The session ID.</value>
         public byte m_key { get; set; }
+        /// <summary>
+        /// Gets or sets the client.
+        /// </summary>
+        /// <value>The client.</value>
+        public Socket m_Socket => this.m_Client;
+
+        private Socket m_Client;
+        /// <summary>
+        /// Gets or sets the client.
+        /// </summary>
+        /// <value>The client.</value>
+        public Socket Client
+        {
+            get { return m_Client; }
+        }
+
+        protected bool IsInClosingOrClosed
+        {
+            get { return m_State >= SocketState.InClosing; }
+        }
+
+        protected bool IsClosed
+        {
+            get { return m_State >= SocketState.Closed; }
+        }
+
+        /// <summary>
+        /// Gets the local end point.
+        /// </summary>
+        /// <value>The local end point.</value>
+        public virtual IPEndPoint LocalEndPoint { get; protected set; }
+
+        /// <summary>
+        /// Gets the remote end point.
+        /// </summary>
+        /// <value>The remote end point.</value>
+        public virtual IPEndPoint RemoteEndPoint { get; protected set; }
+
+        /// <summary>
+        /// Gets or sets the session ID.
+        /// </summary>
+        /// <value>The session ID.</value>
+        public string SessionID { get; private set; }
 
         /// <summary>
         /// Gets or sets the config.
@@ -63,113 +110,108 @@ namespace PangyaAPI.SuperSocket.Engine
         /// </summary>
         public Action<ISocketSession, CloseReason> Closed { get; set; }
 
-        /// <summary>
-        /// Gets or sets the client.
-        /// </summary>
-        /// <value>The client.</value>
-        public Socket Client => this.m_Client;
+        private SendingQueue m_SendingQueue;
 
-        protected bool IsInClosingOrClosed => this.m_State >= 16;
+        protected bool SyncSend { get; private set; }
 
-        protected bool IsClosed => this.m_State >= 16777216;
+        private ISmartPool<SendingQueue> m_SendingQueuePool;
 
-        /// <summary>
-        /// Gets the local end point.
-        /// </summary>
-        /// <value>The local end point.</value>
-        public virtual IPEndPoint LocalEndPoint { get; protected set; }
+        private const int m_CloseReasonMagic = 256;
 
-        /// <summary>
-        /// Gets the remote end point.
-        /// </summary>
-        /// <value>The remote end point.</value>
-        public virtual IPEndPoint RemoteEndPoint { get; protected set; }
-
-        public abstract int OrigReceiveOffset { get; }
+        public SocketSession(Socket client)
+        {
+            m_Client = client ?? throw new ArgumentNullException("socket is null");
+            SessionID = Guid.NewGuid().ToString();
+            LocalEndPoint = (IPEndPoint)client.LocalEndPoint;
+            RemoteEndPoint = (IPEndPoint)client.RemoteEndPoint;
+        }
 
         private void AddStateFlag(int stateValue)
         {
-            this.AddStateFlag(stateValue, notClosing: false);
+            AddStateFlag(stateValue, false);
         }
 
         private bool AddStateFlag(int stateValue, bool notClosing)
         {
-            int state;
-            do
+            while (true)
             {
-                state = this.m_State;
-                if (notClosing && state >= 16)
+                var oldState = m_State;
+
+                if (notClosing)
                 {
-                    return false;
+                    // don't update the state if the connection has entered the closing procedure
+                    if (oldState >= SocketState.InClosing)
+                    {
+                        return false;
+                    }
                 }
+
+                var newState = m_State | stateValue;
+
+                if (Interlocked.CompareExchange(ref m_State, newState, oldState) == oldState)
+                    return true;
             }
-            while (Interlocked.CompareExchange(value: this.m_State | stateValue, location1: ref this.m_State, comparand: state) != state);
-            return true;
         }
 
         private bool TryAddStateFlag(int stateValue)
         {
-            int state;
-            int num;
-            do
+            while (true)
             {
-                state = this.m_State;
-                num = this.m_State | stateValue;
-                if (state == num)
+                var oldState = m_State;
+                var newState = m_State | stateValue;
+
+                //Already marked
+                if (oldState == newState)
                 {
                     return false;
                 }
+
+                var compareState = Interlocked.CompareExchange(ref m_State, newState, oldState);
+
+                if (compareState == oldState)
+                    return true;
             }
-            while (Interlocked.CompareExchange(ref this.m_State, num, state) != state);
-            return true;
         }
 
         private void RemoveStateFlag(int stateValue)
         {
-            int state;
-            do
+            while (true)
             {
-                state = this.m_State;
+                var oldState = m_State;
+                var newState = m_State & (~stateValue);
+
+                if (Interlocked.CompareExchange(ref m_State, newState, oldState) == oldState)
+                    return;
             }
-            while (Interlocked.CompareExchange(value: this.m_State & ~stateValue, location1: ref this.m_State, comparand: state) != state);
         }
 
         private bool CheckState(int stateValue)
         {
-            return (this.m_State & stateValue) == stateValue;
+            return (m_State & stateValue) == stateValue;
         }
 
-        public SocketSession(Socket client)
-        {
-            if (client == null)
-            {
-                throw new ArgumentNullException("client");
-            }
-            this.m_Client = client;
-            this.LocalEndPoint = (IPEndPoint)client.LocalEndPoint;
-            this.RemoteEndPoint = (IPEndPoint)client.RemoteEndPoint;
-        }
-
-        public SocketSession(uint sessionID)
-        {
-            this.m_oid = sessionID;
-        }
 
         public virtual void Initialize(IAppSession appSession)
         {
-            //IL_003f:
-            this.AppSession = appSession;
-            this.Config = appSession.Config;
-            this.SyncSend = this.Config.SyncSend;
-            if (this.m_SendingQueuePool == null)
+            try
             {
-                this.m_SendingQueuePool = (ISmartPool<SendingQueue>)appSession.AppServer.SendingQueuePool;
+                AppSession = appSession;
+                Config = appSession.Config;
+                SyncSend = Config.SyncSend;
+
+                if (m_SendingQueuePool == null)
+                    m_SendingQueuePool = ((SocketServerBase)((ISocketServerAccessor)appSession.AppServer).SocketServer).SendingQueuePool;
+
+                if (m_SendingQueuePool.TryGet(out SendingQueue queue))
+                {
+                    m_SendingQueue = queue;
+                    queue.StartEnqueue();
+                }
             }
-            SendingQueue val = default(SendingQueue);
-            if (this.m_SendingQueuePool.TryGet(out val))
+            catch (Exception)
             {
-                this.m_SendingQueue = val;
-                val.StartEnqueue();
+
+                throw;
             }
         }
 
@@ -183,7 +225,7 @@ namespace PangyaAPI.SuperSocket.Engine
         /// </summary>
         protected virtual void StartSession()
         {
-            this.AppSession.StartSession();
+            AppSession.StartSession();
         }
 
         /// <summary>
@@ -191,27 +233,32 @@ namespace PangyaAPI.SuperSocket.Engine
         /// </summary>
         protected virtual void OnClosed(CloseReason reason)
         {
-            //IL_006e:
-            if (!this.TryAddStateFlag(16777216))
-            {
+            //Already closed
+            if (!TryAddStateFlag(SocketState.Closed))
                 return;
-            }
+
+            //Before changing m_SendingQueue, must check m_IsClosed
             while (true)
             {
-                SendingQueue sendingQueue;
-                sendingQueue = this.m_SendingQueue;
+                var sendingQueue = m_SendingQueue;
+
                 if (sendingQueue == null)
-                {
                     break;
-                }
-                if (Interlocked.CompareExchange(ref this.m_SendingQueue, null, sendingQueue) == sendingQueue)
+
+                //There is no sending was started after the m_Closed ws set to 'true'
+                if (Interlocked.CompareExchange(ref m_SendingQueue, null, sendingQueue) == sendingQueue)
                 {
                     sendingQueue.Clear();
-                    this.m_SendingQueuePool.Push(sendingQueue);
+                    m_SendingQueuePool.Push(sendingQueue);
                     break;
                 }
             }
-            this.Closed?.Invoke((ISocketSession)(object)this, reason);
+
+            var closedHandler = Closed;
+            if (closedHandler != null)
+            {
+                closedHandler(this, reason);
+            }
         }
 
         /// <summary>
@@ -221,23 +268,20 @@ namespace PangyaAPI.SuperSocket.Engine
         /// <returns></returns>
         public bool TrySend(IList<ArraySegment<byte>> segments)
         {
-            if (this.IsClosed)
-            {
+            if (IsClosed)
                 return false;
-            }
-            SendingQueue sendingQueue;
-            sendingQueue = this.m_SendingQueue;
-            if (sendingQueue == null)
-            {
+
+            var queue = m_SendingQueue;
+
+            if (queue == null)
                 return false;
-            }
-            ushort trackID;
-            trackID = sendingQueue.TrackID;
-            if (!sendingQueue.Enqueue(segments, trackID))
-            {
+
+            var trackID = queue.TrackID;
+
+            if (!queue.Enqueue(segments, trackID))
                 return false;
-            }
-            this.StartSend(sendingQueue, trackID, initial: true);
+
+            StartSend(queue, trackID, true);
             return true;
         }
 
@@ -248,23 +292,20 @@ namespace PangyaAPI.SuperSocket.Engine
         /// <returns></returns>
         public bool TrySend(ArraySegment<byte> segment)
         {
-            if (this.IsClosed)
-            {
+            if (IsClosed)
                 return false;
-            }
-            SendingQueue sendingQueue;
-            sendingQueue = this.m_SendingQueue;
-            if (sendingQueue == null)
-            {
+
+            var queue = m_SendingQueue;
+
+            if (queue == null)
                 return false;
-            }
-            ushort trackID;
-            trackID = sendingQueue.TrackID;
-            if (!sendingQueue.Enqueue(segment, trackID))
-            {
+
+            var trackID = queue.TrackID;
+
+            if (!queue.Enqueue(segment, trackID))
                 return false;
-            }
-            this.StartSend(sendingQueue, trackID, initial: true);
+
+            StartSend(queue, trackID, true);
             return true;
         }
 
@@ -282,13 +323,13 @@ namespace PangyaAPI.SuperSocket.Engine
 
         private void Send(SendingQueue queue)
         {
-            if (this.SyncSend)
+            if (SyncSend)
             {
-                this.SendSync(queue);
+                SendSync(queue);
             }
             else
             {
-                this.SendAsync(queue);
+                SendAsync(queue);
             }
         }
 
@@ -296,168 +337,173 @@ namespace PangyaAPI.SuperSocket.Engine
         {
             if (initial)
             {
-                if (!this.TryAddStateFlag(1))
+                if (!TryAddStateFlag(SocketState.InSending))
                 {
                     return;
                 }
-                SendingQueue sendingQueue;
-                sendingQueue = this.m_SendingQueue;
-                if (sendingQueue != queue || sendingTrackID != sendingQueue.TrackID)
+
+                var currentQueue = m_SendingQueue;
+
+                if (currentQueue != queue || sendingTrackID != currentQueue.TrackID)
                 {
-                    this.OnSendEnd();
+                    //Has been sent
+                    OnSendEnd();
                     return;
                 }
             }
-            SendingQueue val = default(SendingQueue);
-            if (this.IsInClosingOrClosed && this.TryValidateClosedBySocket(out var _))
+
+            Socket client;
+
+            if (IsInClosingOrClosed && TryValidateClosedBySocket(out client))
             {
-                this.OnSendEnd(isInClosingOrClosed: true);
+                OnSendEnd();
+                return;
             }
-            else if (!this.m_SendingQueuePool.TryGet(out val))
+
+            SendingQueue newQueue;
+
+            if (!m_SendingQueuePool.TryGet(out newQueue))
             {
-                this.OnSendEnd(isInClosingOrClosed: false);
-                this.Close((CloseReason)8);
+                OnSendEnd(CloseReason.InternalError, true);
+                _smp.Message_Pool.push("There is no enougth sending queue can be used.");
+                return;
             }
-            else if (!object.ReferenceEquals(Interlocked.CompareExchange(ref this.m_SendingQueue, val, queue), queue))
+
+            var oldQueue = Interlocked.CompareExchange(ref m_SendingQueue, newQueue, queue);
+
+            if (!ReferenceEquals(oldQueue, queue))
             {
-                if (val != null)
+                if (newQueue != null)
+                    m_SendingQueuePool.Push(newQueue);
+
+                if (IsInClosingOrClosed)
                 {
-                    this.m_SendingQueuePool.Push(val);
-                }
-                if (this.IsInClosingOrClosed)
-                {
-                    this.OnSendEnd(isInClosingOrClosed: true);
-                    return;
-                }
-                this.OnSendEnd(isInClosingOrClosed: false);
-                this.Close((CloseReason)8);
-            }
-            else
-            {
-                val.StartEnqueue();
-                queue.StopEnqueue();
-                if (queue.Count == 0)
-                {
-                    this.m_SendingQueuePool.Push(queue);
-                    this.OnSendEnd(isInClosingOrClosed: false);
-                    this.Close((CloseReason)8);
+                    OnSendEnd();
                 }
                 else
                 {
-                    this.Send(queue);
+                    OnSendEnd(CloseReason.InternalError, true);
+                    _smp.Message_Pool.push("Failed to switch the sending queue.");
                 }
+
+                return;
             }
+
+            //Start to allow enqueue
+            newQueue.StartEnqueue();
+            queue.StopEnqueue();
+
+            if (queue.Count == 0)
+            {
+
+                m_SendingQueuePool.Push(queue);
+                OnSendEnd(CloseReason.InternalError, true);
+                _smp.Message_Pool.push("There is no data to be sent in the queue.");
+                return;
+            }
+
+            Send(queue);
         }
 
         private void OnSendEnd()
         {
-            this.OnSendEnd(this.IsInClosingOrClosed);
+            OnSendEnd(CloseReason.Unknown, false);
         }
 
-        private void OnSendEnd(bool isInClosingOrClosed)
+        private void OnSendEnd(CloseReason closeReason, bool forceClose)
         {
-            this.RemoveStateFlag(1);
-            if (!isInClosingOrClosed)
-            {
-                return;
-            }
-            if (!this.TryValidateClosedBySocket(out var socket))
-            {
-                SendingQueue sendingQueue;
-                sendingQueue = this.m_SendingQueue;
-                if (sendingQueue != null && sendingQueue.Count == 0)
-                {
-                    if (socket != null)
-                    {
-                        this.InternalClose(socket, this.GetCloseReasonFromState(), setCloseReason: false);
-                    }
-                    else
-                    {
-                        this.OnClosed(this.GetCloseReasonFromState());
-                    }
-                }
-            }
-            else if (this.ValidateNotInSendingReceiving())
-            {
-                this.FireCloseEvent();
-            }
+            RemoveStateFlag(SocketState.InSending);
+            ValidateClosed(closeReason, forceClose, true);
         }
 
         protected virtual void OnSendingCompleted(SendingQueue queue)
         {
             queue.Clear();
-            this.m_SendingQueuePool.Push(queue);
-            SendingQueue sendingQueue;
-            sendingQueue = this.m_SendingQueue;
-            if (this.IsInClosingOrClosed)
+            m_SendingQueuePool.Push(queue);
+
+            var newQueue = m_SendingQueue;
+
+            if (IsInClosingOrClosed)
             {
-                if (sendingQueue.Count > 0 && !this.TryValidateClosedBySocket(out var _))
+                Socket client;
+
+                //has data is being sent and the socket isn't closed
+                if (newQueue.Count > 0 && !TryValidateClosedBySocket(out client))
                 {
-                    this.StartSend(sendingQueue, sendingQueue.TrackID, initial: false);
+                    StartSend(newQueue, newQueue.TrackID, false);
+                    return;
                 }
-                else
-                {
-                    this.OnSendEnd(isInClosingOrClosed: true);
-                }
+
+                OnSendEnd();
+                return;
             }
-            else if (sendingQueue.Count == 0)
+
+            if (newQueue.Count == 0)
             {
-                this.OnSendEnd();
-                if (sendingQueue.Count > 0)
+                OnSendEnd();
+
+                if (newQueue.Count > 0)
                 {
-                    this.StartSend(sendingQueue, sendingQueue.TrackID, initial: true);
+                    StartSend(newQueue, newQueue.TrackID, true);
                 }
             }
             else
             {
-                this.StartSend(sendingQueue, sendingQueue.TrackID, initial: false);
+                StartSend(newQueue, newQueue.TrackID, false);
             }
         }
 
-        public abstract void ApplySecureProtocol();
-
         public Stream GetUnderlyStream()
         {
-            return new NetworkStream(this.Client);
-        }
+            return new NetworkStream(Client);
+        }        
 
         protected virtual bool TryValidateClosedBySocket(out Socket socket)
         {
-            socket = this.m_Client;
+            socket = m_Client;
+            //Already closed/closing
             return socket == null;
         }
 
         public virtual void Close(CloseReason reason)
         {
-            if (this.TryAddStateFlag(16) && !this.TryValidateClosedBySocket(out var socket))
+            //Already in closing procedure
+            if (!TryAddStateFlag(SocketState.InClosing))
+                return;
+
+            Socket client;
+
+            //No need to clean the socket instance
+            if (TryValidateClosedBySocket(out client))
+                return;
+
+            //Some data is in sending
+            if (CheckState(SocketState.InSending))
             {
-                if (this.CheckState(1))
-                {
-                    this.AddStateFlag(this.GetCloseReasonValue(reason));
-                }
-                else if (socket != null)
-                {
-                    this.InternalClose(socket, reason, setCloseReason: true);
-                }
-                else
-                {
-                    this.OnClosed(reason);
-                }
+                //Set closing reason only, don't close the socket directly
+                AddStateFlag(GetCloseReasonValue(reason));
+                return;
             }
+
+            // In the udp mode, we needn't close the socket instance
+            if (client != null)
+                InternalClose(client, reason, true);
+            else //In Udp mode, and the socket is not in the sending state, then fire the closed event directly
+                OnClosed(reason);
         }
 
         private void InternalClose(Socket client, CloseReason reason, bool setCloseReason)
         {
-            if (Interlocked.CompareExchange(ref this.m_Client, null, client) == client)
+            if (Interlocked.CompareExchange(ref m_Client, null, client) == client)
             {
                 if (setCloseReason)
+                    AddStateFlag(GetCloseReasonValue(reason));
+
+                client.SafeClose();
+
+                if (ValidateNotInSendingReceiving())
                 {
-                    this.AddStateFlag(this.GetCloseReasonValue(reason));
-                }
-                client.SafeCloseClientSocket();
-                if (this.ValidateNotInSendingReceiving())
-                {
-                    this.OnClosed(reason);
+                    OnClosed(reason);
                 }
             }
         }
@@ -465,25 +511,32 @@ namespace PangyaAPI.SuperSocket.Engine
         protected void OnSendError(SendingQueue queue, CloseReason closeReason)
         {
             queue.Clear();
-            this.m_SendingQueuePool.Push(queue);
-            this.OnSendEnd();
-            this.ValidateClosed(closeReason);
+            m_SendingQueuePool.Push(queue);
+            OnSendEnd(closeReason, true);
         }
 
+        // the receive action won't be started for this connection any more
         protected void OnReceiveTerminated(CloseReason closeReason)
         {
-            this.OnReceiveEnded();
-            this.ValidateClosed(closeReason);
+            OnReceiveEnded();
+            ValidateClosed(closeReason, true);
         }
 
+
+        // return false if the connection has entered the closing procedure or has closed already
         protected bool OnReceiveStarted()
         {
-            return this.AddStateFlag(2, notClosing: true);
+            if (AddStateFlag(SocketState.InReceiving, true))
+                return true;
+
+            // the connection is in closing
+            ValidateClosed(CloseReason.Unknown, false);
+            return false;
         }
 
         protected void OnReceiveEnded()
         {
-            this.RemoveStateFlag(2);
+            RemoveStateFlag(SocketState.InReceiving);
         }
 
         /// <summary>
@@ -492,87 +545,124 @@ namespace PangyaAPI.SuperSocket.Engine
         /// <returns></returns>
         private bool ValidateNotInSendingReceiving()
         {
-            int state;
-            state = this.m_State;
-            if ((state & -4) == state)
+            var oldState = m_State;
+
+            if ((oldState & SocketState.InSendingReceivingMask) == oldState)
             {
                 return true;
             }
+
             return false;
         }
 
         private int GetCloseReasonValue(CloseReason reason)
         {
-            return (int)reason;
+            return ((int)reason + 1) * m_CloseReasonMagic;
         }
 
         private CloseReason GetCloseReasonFromState()
         {
-            return (CloseReason)m_State;
+            return (CloseReason)(m_State / m_CloseReasonMagic - 1);
         }
 
         private void FireCloseEvent()
         {
-            this.OnClosed(this.GetCloseReasonFromState());
+            OnClosed(GetCloseReasonFromState());
         }
 
-        private void ValidateClosed(CloseReason closeReason)
-        {   if (this.IsClosed)
+        private void ValidateClosed(CloseReason closeReason, bool forceClose)
+        {
+            ValidateClosed(closeReason, forceClose, false);
+        }
+
+        private void ValidateClosed(CloseReason closeReason, bool forceClose, bool forSend)
+        {
+            lock (this)
             {
-                return;
-            }
-            if (this.CheckState(16))
-            {
-                if (this.ValidateNotInSendingReceiving())
+                if (IsClosed)
+                    return;
+
+                if (CheckState(SocketState.InClosing))
                 {
-                    this.FireCloseEvent();
+                    // we only keep socket instance after InClosing state when the it is sending
+                    // so we check if the socket instance is alive now
+                    if (forSend)
+                    {
+                        Socket client;
+
+                        if (!TryValidateClosedBySocket(out client))
+                        {
+                            var sendingQueue = m_SendingQueue;
+                            // No data to be sent
+                            if (forceClose || (sendingQueue != null && sendingQueue.Count == 0))
+                            {
+                                if (client != null)// the socket instance is not closed yet, do it now
+                                    InternalClose(client, GetCloseReasonFromState(), false);
+                                else// The UDP mode, the socket instance always is null, fire the closed event directly
+                                    FireCloseEvent();
+
+                                return;
+                            }
+
+                            return;
+                        }
+                    }
+
+                    if (ValidateNotInSendingReceiving())
+                    {
+                        FireCloseEvent();
+                    }
+                }
+                else if (forceClose)
+                {
+                    Close(closeReason);
                 }
             }
-            else
-            {
-                this.Close(closeReason);
-            }
         }
-
         protected virtual bool IsIgnorableSocketError(int socketErrorCode)
         {
-            if (socketErrorCode == 10004 || socketErrorCode == 10053 || socketErrorCode == 10054 || socketErrorCode == 10058 || socketErrorCode == 10060 || socketErrorCode == 995 || socketErrorCode == -1073741299)
+            if (socketErrorCode == 10004 //Interrupted
+                || socketErrorCode == 10053 //ConnectionAborted
+                || socketErrorCode == 10054 //ConnectionReset
+                || socketErrorCode == 10058 //Shutdown
+                || socketErrorCode == 10060 //TimedOut
+                || socketErrorCode == 995 //OperationAborted
+                || socketErrorCode == -1073741299)
             {
                 return true;
             }
+
             return false;
         }
 
         protected virtual bool IsIgnorableException(Exception e, out int socketErrorCode)
         {
             socketErrorCode = 0;
+
             if (e is ObjectDisposedException || e is NullReferenceException)
-            {
                 return true;
-            }
-            SocketException ex;
+
+            SocketException socketException = null;
+
             if (e is IOException)
             {
                 if (e.InnerException is ObjectDisposedException || e.InnerException is NullReferenceException)
-                {
                     return true;
-                }
-                ex = e.InnerException as SocketException;
+
+                socketException = e.InnerException as SocketException;
             }
             else
             {
-                ex = e as SocketException;
+                socketException = e as SocketException;
             }
-            if (ex == null)
-            {
+
+            if (socketException == null)
                 return false;
-            }
-            socketErrorCode = ex.ErrorCode;
-            //if (this.Config.LogAllSocketException())
-            //{
-            //    return false;
-            //}
-            return this.IsIgnorableSocketError(socketErrorCode);
+
+            socketErrorCode = socketException.ErrorCode;
+
+           
+            return IsIgnorableSocketError(socketErrorCode);
         }
     }
 }

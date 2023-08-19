@@ -6,6 +6,6 @@ namespace PangyaAPI.SuperSocket.Engine
     {
         SocketAsyncEventArgsProxy SocketAsyncProxy { get; }
 
-        Socket Client { get; }
+        Socket m_Socket { get; }
     }
 }

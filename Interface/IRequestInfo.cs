@@ -1,4 +1,6 @@
-﻿namespace PangyaAPI.SuperSocket.Interface
+﻿using PangyaAPI.SuperSocket.SocketBase;
+
+namespace PangyaAPI.SuperSocket.Interface
 {
     /// <summary>
     /// Request information interface
@@ -9,6 +11,9 @@
         /// Gets the ID of this request.
         /// </summary>
         short PacketID { get; }
+        Packet _packet { get; set; }
+
+
     }
 
     /// <summary>

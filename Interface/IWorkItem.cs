@@ -9,7 +9,7 @@ namespace PangyaAPI.SuperSocket.Interface
     /// <summary>
     /// An item can be started and stopped
     /// </summary>
-    public interface IWorkItemBase : IStatusInfoSource, ISystemEndPoint
+    public interface IWorkItemBase
     {
         /// <summary>
         /// Gets the name.
@@ -51,7 +51,7 @@ namespace PangyaAPI.SuperSocket.Interface
     /// <summary>
     /// An item can be started and stopped
     /// </summary>
-    public interface IWorkItem : IWorkItemBase, IStatusInfoSource
+    public interface IWorkItem : IWorkItemBase
     {
        
         /// <summary>

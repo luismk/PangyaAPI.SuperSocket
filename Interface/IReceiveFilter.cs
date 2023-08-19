@@ -19,7 +19,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="rest">The rest, the length of the data which hasn't been parsed.</param>
         /// <returns></returns>
         TRequestInfo Filter(byte[] readBuffer, int offset, int length, bool toBeCopied, out int rest);
-
         /// <summary>
         /// Gets the size of the rest buffer.
         /// </summary>
@@ -27,11 +26,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// The size of the rest buffer.
         /// </value>
         int LeftBufferSize { get; }
-
-        /// <summary>
-        /// Gets the next Receive filter.
-        /// </summary>
-        IReceiveFilter<TRequestInfo> NextReceiveFilter { get; }
 
         /// <summary>
         /// Resets this instance to initial state.

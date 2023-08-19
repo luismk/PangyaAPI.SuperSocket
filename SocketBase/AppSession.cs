@@ -7,9 +7,10 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Text;
 using System.Threading;
+using System.Web.SessionState;
 using PangyaAPI.SuperSocket.Interface;
 using PangyaAPI.Utilities.BinaryModels;
-
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.SocketBase
 {
     /// <summary>
@@ -44,24 +45,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// The charset.
         /// </value>
         public Encoding Charset { get; set; }
-
-        private IDictionary<object, object> m_Items;
-
-        /// <summary>
-        /// Gets the items dictionary, only support 10 items maximum
-        /// </summary>
-        public IDictionary<object, object> Items
-        {
-            get
-            {
-                if (m_Items == null)
-                    m_Items = new Dictionary<object, object>(10);
-
-                return m_Items;
-            }
-        }
-
-
+       
         private bool m_Connected = false;
 
         /// <summary>
@@ -96,7 +80,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
                 }
             }
         }
-
+        public Socket m_sock => this.SocketSession.m_Socket;
 
         /// <summary>
         /// Gets the local listening endpoint.
@@ -142,6 +126,17 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
         IReceiveFilter<TRequestInfo> m_ReceiveFilter;
 
+        public int m_time_start;
+        public int m_tick;
+        public int m_tick_bot;
+        // session autorizada pelo server, fez o login corretamente
+        public bool m_is_authorized;
+        // Marca na session que o socket, levou DC, chegou ao limit de retramission do TCP para transmitir os dados
+        // TCP sockets is that the maximum retransmission count and timeout have been reached on a bad(or broken) link
+        public bool m_connection_timeout;
+        public bool m_state;
+        public bool m_connected_to_send;
+
         #endregion
 
         /// <summary>
@@ -154,33 +149,33 @@ namespace PangyaAPI.SuperSocket.SocketBase
         }
         public virtual string GetNickname() { return ""; }
         public virtual string GetID() { return ""; }
-
         public virtual uint GetUID() { return 0; }
 
         /// <summary>
         /// Initializes the specified app session by AppServer and SocketSession.
         /// </summary>
         /// <param name="appServer">The app server.</param>
-        /// <param name="socketSession">The socket session.</param>
-        public virtual void Initialize(IAppServer<TAppSession, TRequestInfo> appServer, ISocketSession socketSession)
+        /// <param name="appSession">The socket session.</param>
+        public virtual void Initialize(IAppServer<TAppSession, TRequestInfo> appServer, ISocketSession appSession)
         {
-            var castedAppServer = (AppServerBase<TAppSession, TRequestInfo>)appServer;
-            AppServer = castedAppServer;
-            Charset = castedAppServer.TextEncoding;
-            SocketSession = socketSession;
-            m_oid = socketSession.m_oid;
-            m_Connected = true;
-            m_ReceiveFilter = castedAppServer.ReceiveFilterFactory.CreateFilter(appServer, this, socketSession.RemoteEndPoint);
+            if (appServer is null)
+            {
+                throw new ArgumentNullException(nameof(appServer));
+            }
 
-            var filterInitializer = m_ReceiveFilter as Interface.IReceiveFilterInitializer;
-            if (filterInitializer != null)
-                filterInitializer.Initialize(castedAppServer, this);
-
-            socketSession.Initialize(this);
-
+            using (var Server = appServer as AppServerBase<TAppSession, TRequestInfo>)
+            {
+                AppServer = Server;
+                Charset = Server.TextEncoding;
+                SocketSession = appSession;
+                m_oid = appSession.m_oid = Server.NextConnectionID;
+                m_ReceiveFilter = Server.ReceiveFilterFactory.CreateFilter(appServer, this, appSession.RemoteEndPoint);
+                IReceiveFilterInitializer filterInitializer = m_ReceiveFilter as IReceiveFilterInitializer;
+                filterInitializer?.Initialize(Server, this);
+            }
+            appSession.Initialize(this);
             OnInit();
         }
-
         /// <summary>
         /// Starts the session.
         /// </summary>
@@ -194,7 +189,12 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         protected virtual void OnInit()
         {
-
+            this.m_time_start = this.m_tick = Environment.TickCount;
+            Key = (byte)new Random().Next(1, 15);
+            m_Connected = true;
+            SetTimeStartAndTick(Environment.TickCount);
+            this.SetState(true);
+            this.SetConnected(true);
         }
 
         /// <summary>
@@ -202,6 +202,34 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         protected virtual void OnSessionStarted()
         {
+            ////metodo que faz uma checagem em tempo em tempo[verificar se a conexao ta ativa ainda]
+            //// Define um tempo limite em milissegundos (exemplo: 5 segundos)
+            //Thread checkConnectionThread = new Thread(() =>
+            //{
+            //int timeoutMillis = 5000;
+
+            //while (m_sock != null)
+            //{
+            //        // Verifica se a conexão está ativa após o tempo limite
+            //        if (m_sock!= null)                    {
+
+            //            bool isConnected = m_sock.Poll(timeoutMillis * 1000, SelectMode.SelectRead);
+
+            //            if (isConnected && m_sock != null && m_sock.Available == 0)
+            //            {
+            //                Console.WriteLine("A conexão está ativa.");
+            //            }
+            //            else
+            //            {
+            //                Console.WriteLine("A conexão não está mais ativa.");
+            //            }
+            //        }
+            //    }
+            //});
+
+            //// Inicia a thread de verificação
+            //checkConnectionThread.Start();
+
 
         }
 
@@ -211,9 +239,30 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="reason">The reason.</param>
         internal protected virtual void OnSessionClosed(CloseReason reason)
         {
+            //metodo que faz uma dispose em tempo em tempo[verificar se a conexao ta ativa ainda]
 
+            Dispose();
         }
 
+        private bool GetState()
+        {
+            return m_state;
+        }
+
+        public void SetState(bool state)
+        {
+            m_state = state;
+        }
+
+        public void SetConnected(bool connected)
+        {
+            SetConnectedToSend(connected);
+        }
+
+        public void SetConnectedToSend(bool connectedToSend)
+        {
+            m_connected_to_send = connectedToSend;
+        }
 
         /// <summary>
         /// Handles the exceptional error, it only handles application error.
@@ -221,7 +270,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <param name="e">The exception.</param>
         protected virtual void HandleException(Exception e)
         {
-            //Logger.Error(this, e);
+            _smp.Message_Pool.push("[AppSession::HandleException][LogException]: " + e.Message);
             this.Close(CloseReason.ApplicationError);
         }
 
@@ -284,6 +333,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
             Send(data, 0, data.Length);
         }
 
+
         /// <summary>
         /// Try to send the data to client.
         /// </summary>
@@ -318,7 +368,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         }
         public virtual void Send(Packet packet)
         {
-            InternalSend(new ArraySegment<byte>(packet.GetBytes, 0, packet.GetBytes.Length));
+            InternalSend(new ArraySegment<byte>(packet.GetMakedBuf().Buffer, 0, (int)packet.GetMakedBuf().Length));
         }
         public virtual void Send(PangyaBinaryWriter packet)
         {
@@ -473,15 +523,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         #region Receiving processing
 
         /// <summary>
-        /// Sets the next Receive filter which will be used when next data block received
-        /// </summary>
-        /// <param name="nextReceiveFilter">The next receive filter.</param>
-        protected void SetNextReceiveFilter(IReceiveFilter<TRequestInfo> nextReceiveFilter)
-        {
-            m_ReceiveFilter = nextReceiveFilter;
-        }
-
-        /// <summary>
         /// Gets the maximum allowed length of the request.
         /// </summary>
         /// <returns></returns>
@@ -502,55 +543,61 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// <returns></returns>
         TRequestInfo FilterRequest(byte[] readBuffer, int offset, int length, bool toBeCopied, out int rest, out int offsetDelta)
         {
-            if (!AppServer.OnRawDataReceived(this, readBuffer, offset, length))
+            try
             {
+                var ReceiveFilter = m_ReceiveFilter as PangyaReceiveFilter;
+                if (!AppServer.OnRawDataReceived(this, readBuffer, offset, length))
+                {
+                    rest = 0;
+                    offsetDelta = 0;
+                    return null;
+                }
+
+                var currentRequestLength = ReceiveFilter.LeftBufferSize;
+
+                var requestInfo = ReceiveFilter.Filter(m_key, readBuffer, offset, length);
                 rest = 0;
-                offsetDelta = 0;
-                return null;
+
+                if (ReceiveFilter.State == FilterState.Error)
+                {
+                    rest = 0;
+                    offsetDelta = 0;
+                    Close(CloseReason.ProtocolError);
+                    return null;
+                }
+
+                var offsetAdapter = ReceiveFilter as IOffsetAdapter;
+
+                offsetDelta = offsetAdapter != null ? offsetAdapter.OffsetDelta : 0;
+
+                if (requestInfo == null)
+                {
+                    //current buffered length
+                    currentRequestLength = ReceiveFilter.LeftBufferSize;
+                }
+                else
+                {
+                    //current request length
+                    currentRequestLength = currentRequestLength + length - rest;
+                }
+
+                var maxRequestLength = GetMaxRequestLength();
+
+                if (currentRequestLength >= maxRequestLength)
+                {
+                    //if (Logger.IsErrorEnabled)
+                    _smp.Message_Pool.push(string.Format("[AppSession::FilterRequest()][Error]: Max request length: {0}, current processed length: {1}", maxRequestLength, currentRequestLength));
+
+                    Close(CloseReason.ProtocolError);
+                    return null;
+                }
+
+                return requestInfo as TRequestInfo;
             }
-
-            var currentRequestLength = m_ReceiveFilter.LeftBufferSize;
-
-            var requestInfo = m_ReceiveFilter.Filter(readBuffer, offset, length, toBeCopied, out rest);
-            if (m_ReceiveFilter.State == FilterState.Error)
+            catch (Exception)
             {
-                rest = 0;
-                offsetDelta = 0;
-                Close(CloseReason.ProtocolError);
-                return null;
+                throw;
             }
-
-            var offsetAdapter = m_ReceiveFilter as IOffsetAdapter;
-
-            offsetDelta = offsetAdapter != null ? offsetAdapter.OffsetDelta : 0;
-
-            if (requestInfo == null)
-            {
-                //current buffered length
-                currentRequestLength = m_ReceiveFilter.LeftBufferSize;
-            }
-            else
-            {
-                //current request length
-                currentRequestLength = currentRequestLength + length - rest;
-            }
-
-            var maxRequestLength = GetMaxRequestLength();
-
-            if (currentRequestLength >= maxRequestLength)
-            {
-                //if (Logger.IsErrorEnabled)
-                //    Logger.Error(this, string.Format("Max request length: {0}, current processed length: {1}", maxRequestLength, currentRequestLength));
-
-                Close(CloseReason.ProtocolError);
-                return null;
-            }
-
-            //If next Receive filter wasn't set, still use current Receive filter in next round received data processing
-            if (m_ReceiveFilter.NextReceiveFilter != null)
-                m_ReceiveFilter = m_ReceiveFilter.NextReceiveFilter;
-
-            return requestInfo;
         }
 
         /// <summary>
@@ -565,11 +612,9 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </returns>
         int IAppSession.ProcessRequest(byte[] readBuffer, int offset, int length, bool toBeCopied)
         {
-            int rest, offsetDelta;
-
             while (true)
             {
-                var requestInfo = FilterRequest(readBuffer, offset, length, toBeCopied, out rest, out offsetDelta);
+                var requestInfo = FilterRequest(readBuffer, offset, length, toBeCopied, out int rest, out int offsetDelta);
 
                 if (requestInfo != null)
                 {
@@ -594,21 +639,31 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
-        public void Initialize(IAppServer appServer, Socket client)
-        {
-            //throw new NotImplementedException();
-        }
 
         public void Dispose()
         {
-            //throw new NotImplementedException();
+            // Suppress finalization.
+            GC.SuppressFinalize(this);
         }
 
         public void HandleExceptionalError(Exception e)
         {
-          //  //throw new NotImplementedException();
+            //  //throw new NotImplementedException();
+        }
+        internal bool Clear()
+        {
+            return true;
         }
 
+        internal void SetOID(uint index)
+        {
+            m_oid = index;
+        }
+
+        internal void SetTimeStartAndTick(int tickCount)
+        {
+            m_tick = tickCount;
+        }
         #endregion
     }
 
@@ -690,6 +745,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         {
             base.Send(ProcessSendingMessage(message), paramValues);
         }
+
     }
 
     /// <summary>
@@ -699,6 +755,4 @@ namespace PangyaAPI.SuperSocket.SocketBase
     {
 
     }
-
-
 }

@@ -33,7 +33,7 @@ namespace ServerConsole.Session
             return m_pi.id;
         }
 
-        internal void SendMessage(LoginMessages.IMessage message)
+        public void SendMessage(LoginMessages.IMessage message)
         {
             Send(message.ToBytes());
         }

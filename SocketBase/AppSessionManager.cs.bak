@@ -16,12 +16,16 @@ namespace PangyaAPI.SuperSocket.SocketBase
         private object m_cs = new object(); // Use object for locking in C#
         private List<AppSession> m_sessions = new List<AppSession>();
 
-       
+        private const int STDA_TIME_LIMIT_NON_AUTHORIZED = 60000; // Example value, adjust as needed
+        private double m_TTL; // You might need to adjust the type based on its usage
+
         private List<AppSession> m_sessionsDel = new List<AppSession>();
         private int m_max_session;
         public AppSessionManager(int maxSession)
         {
             m_max_session = maxSession;
+            m_TTL = 0;
+
             // Load config from server.ini
             ConfigInit();
 
@@ -54,6 +58,66 @@ namespace PangyaAPI.SuperSocket.SocketBase
             }
         }
 
+
+        internal TAppSession AddSession<TAppSession, TRequestInfo>(AppSession<TAppSession, TRequestInfo> appSession)
+            where TAppSession : AppSession<TAppSession, TRequestInfo>, IAppSession, new()
+            where TRequestInfo : class, IRequestInfo
+        {
+            if (appSession == null)
+                throw new Exception("[session_manager::addSession][ERR_SESSION] appSession is invalid.");
+
+
+            var pSession = appSession;
+            lock (m_cs)
+            {
+                uint index = FindSessionFree();
+                if (index == uint.MaxValue)
+                {
+                    throw new Exception("[session_manager::addSession][ERR_SESSION] already goal limit session estabilized.");
+                }
+
+                pSession.SetOID(index);
+                pSession.SetTimeStartAndTick(Environment.TickCount);
+                m_sessions[(int)index] = pSession;
+                m_count++;
+            }
+
+            return pSession as IAppSession;
+        }
+        public IAppSession AddSession(AppSession appSession)
+        {
+            
+        }
+
+        public void CheckSessionLive()
+        {
+            Thread t2 = new Thread(new ThreadStart(() =>
+            {
+                double currentTime = (double)DateTime.Now.Ticks / TimeSpan.TicksPerSecond;
+
+                foreach (var el in m_sessions)
+                {
+                    if (el.m_sock != null)
+                    {
+                        int connTime = el.GetConnectTime();
+                        if (connTime < 0)
+                        {
+                            m_sessionsDel.Add(el);
+                        }
+                        else if (!el.m_is_authorized && (currentTime - el.m_time_start) > (STDA_TIME_LIMIT_NON_AUTHORIZED / 1000.0))
+                        {
+                            m_sessionsDel.Add(el);
+                        }
+                        else if (m_TTL > 0 && (currentTime - el.m_tick) > (m_TTL / 1000.0))
+                        {
+                            m_sessionsDel.Add(el);
+                        }
+                    }
+                }
+            }));
+
+            t2.Start();
+        }
         public virtual bool DeleteSession(AppSession session)
         {
             bool ret = true;

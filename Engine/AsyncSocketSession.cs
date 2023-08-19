@@ -6,7 +6,7 @@ using System.Threading;
 using System.Web;
 using System;
 using System.Linq;
-
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.Engine
 {
     internal class AsyncSocketSession : SocketSession, IAsyncSocketSession, IAsyncSocketSessionBase
@@ -62,7 +62,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             else
             {
-                ////base.LogError((int)e.SocketError, "ProcessCompleted", "d:\\WorkShop\\SuperSocket\\v1.6\\SocketEngine\\AsyncSocketSession.cs", 76);
+               _smp.Message_Pool.push((int)e.SocketError, "ProcessCompleted", 76);
             }
             return false;
         }
@@ -80,11 +80,11 @@ namespace PangyaAPI.SuperSocket.Engine
                 return;
             }
             int num;
-            num = ((IEnumerable<ArraySegment<byte>>)val).Sum((ArraySegment<byte> q) => q.Count);
+            num = val.Sum((ArraySegment<byte> q) => q.Count);
             if (num != e.BytesTransferred)
             {
                 val.InternalTrim(e.BytesTransferred);
-               // base.AppSession.Logger().InfoFormat("{0} of {1} were transferred, send the rest {2} bytes right now.", (object)e.BytesTransferred, (object)num, (object)((IEnumerable<ArraySegment<byte>>)val).Sum((ArraySegment<byte> q) => q.Count));
+               _smp.Message_Pool.push(string.Format("{0} of {1} were transferred, send the rest {2} bytes right now.", (object)e.BytesTransferred, (object)num, (object)((IEnumerable<ArraySegment<byte>>)val).Sum((ArraySegment<byte> q) => q.Count)));
                 this.ClearPrevSendState(e);
                 this.SendAsync(val);
             }
@@ -132,11 +132,12 @@ namespace PangyaAPI.SuperSocket.Engine
                 {
                     return;
                 }
-                flag = base.Client.ReceiveAsync(e);
+                
+                flag = base.m_Socket.ReceiveAsync(e);
             }
             catch (Exception exception)
             {
-                //base.LogError(exception, "StartReceive", "d:\\WorkShop\\SuperSocket\\v1.6\\SocketEngine\\AsyncSocketSession.cs", 152);
+                _smp.Message_Pool.push("StartReceive", exception);
                 base.OnReceiveTerminated((CloseReason)5);
                 return;
             }
@@ -154,9 +155,8 @@ namespace PangyaAPI.SuperSocket.Engine
                 {
                     ArraySegment<byte> arraySegment;
                     arraySegment = queue[i];
-                    Socket client;
-                    client = base.Client;
-                    if (client == null)
+                    Socket client = m_Socket;
+                    if (client == null || !client.Connected)
                     {
                         return;
                     }
@@ -166,7 +166,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception exception)
             {
-                //base.LogError(exception, "SendSync", "d:\\WorkShop\\SuperSocket\\v1.6\\SocketEngine\\AsyncSocketSession.cs", 183);
+                _smp.Message_Pool.push("SendSync", exception);
                 base.OnSendError(queue, (CloseReason)5);
             }
         }
@@ -178,7 +178,7 @@ namespace PangyaAPI.SuperSocket.Engine
                 this.m_SocketEventArgSend.UserToken = queue;
                 if (queue.Count() > 1)
                 {
-                    this.m_SocketEventArgSend.BufferList = (IList<ArraySegment<byte>>)queue;
+                    this.m_SocketEventArgSend.BufferList = queue;
                 }
                 else
                 {
@@ -187,7 +187,7 @@ namespace PangyaAPI.SuperSocket.Engine
                     this.m_SocketEventArgSend.SetBuffer(arraySegment.Array, arraySegment.Offset, arraySegment.Count);
                 }
                 Socket client;
-                client = base.Client;
+                client = base.m_Socket;
                 if (client == null)
                 {
                     base.OnSendError(queue, (CloseReason)5);
@@ -199,7 +199,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception exception)
             {
-                //base.LogError(exception, "SendAsync", "d:\\WorkShop\\SuperSocket\\v1.6\\SocketEngine\\AsyncSocketSession.cs", 217);
+                _smp.Message_Pool.push("SendAsync", exception);
                 this.ClearPrevSendState(this.m_SocketEventArgSend);
                 base.OnSendError(queue, (CloseReason)5);
             }
@@ -213,14 +213,22 @@ namespace PangyaAPI.SuperSocket.Engine
                 return;
             }
             base.OnReceiveEnded();
-            int offsetDelta;
+            int offsetDelta =0;
             try
             {
-                offsetDelta = base.AppSession.ProcessRequest(e.Buffer, e.Offset, e.BytesTransferred, true);
+                if (e.BytesTransferred > 0)
+                {
+                    offsetDelta = base.AppSession.ProcessRequest(e.Buffer, e.Offset, e.BytesTransferred, true);
+                }
+                else
+                {
+                    Console.WriteLine("No response received from client within the timeout. Disconnecting.");
+                    this.Close((CloseReason)7);
+                }
             }
             catch (Exception exception)
             {
-                //base.LogError("Protocol error", exception, "ProcessReceive", "d:\\WorkShop\\SuperSocket\\v1.6\\SocketEngine\\AsyncSocketSession.cs", 244);
+                _smp.Message_Pool.push("ProtocolError", exception, "ProcessReceive", 244);
                 this.Close((CloseReason)7);
                 return;
             }
@@ -229,8 +237,6 @@ namespace PangyaAPI.SuperSocket.Engine
 
         protected override void OnClosed(CloseReason reason)
         {
-            //IL_0015: Unknown result type (might be due to invalid IL or missing references)
-            //IL_003e: Unknown result type (might be due to invalid IL or missing references)
             SocketAsyncEventArgs socketEventArgSend;
             socketEventArgSend = this.m_SocketEventArgSend;
             if (socketEventArgSend == null)
@@ -244,8 +250,5 @@ namespace PangyaAPI.SuperSocket.Engine
             }
         }
 
-        public override void ApplySecureProtocol()
-        {
-        }
     }
 }

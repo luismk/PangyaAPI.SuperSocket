@@ -9,7 +9,7 @@ namespace PangyaAPI.SuperSocket.Ext
 {
     public static class SocketEx
     {
-        public static void SafeCloseClientSocket(this Socket client)
+        public static void SafeClose(this Socket client)
         {
             if (client == null)
                 return;

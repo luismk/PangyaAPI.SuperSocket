@@ -45,9 +45,9 @@ namespace PangyaAPI.SuperSocket.Engine
             if (m_SendBufferSize > 0)
                 client.SendBufferSize = m_SendBufferSize;
 
-            //if (!Platform.SupportSocketIOControlByCodeEnum)
-            //    client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, m_KeepAliveOptionValues);
-            //else
+
+                client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, m_KeepAliveOptionValues);
+
                 client.IOControl(IOControlCode.KeepAliveValues, m_KeepAliveOptionValues, m_KeepAliveOptionOutValues);
 
             client.NoDelay = true;

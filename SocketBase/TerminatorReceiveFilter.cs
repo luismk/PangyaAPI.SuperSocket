@@ -175,7 +175,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
 
             return requestInfo;
         }
-
         private void InternalReset()
         {
             m_ParsedLengthInBuffer = 0;

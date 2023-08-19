@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Net;
-using System.Security.Authentication;
 using System;
 
 namespace PangyaAPI.SuperSocket.Interface
@@ -95,7 +94,7 @@ namespace PangyaAPI.SuperSocket.Interface
         /// <summary>
         /// Gets the client socket.
         /// </summary>
-        Socket Client { get; }
+        Socket m_Socket { get; }
 
         /// <summary>
         /// Gets the local listening endpoint.

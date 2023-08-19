@@ -1,4 +1,5 @@
-﻿using PangyaAPI.SuperSocket.Interface;
+﻿using PangyaAPI.SuperSocket.Ext;
+using PangyaAPI.SuperSocket.Interface;
 using PangyaAPI.SuperSocket.SocketBase;
 using System;
 using System.Collections.Concurrent;
@@ -7,6 +8,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Threading.Tasks;
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.Engine
 {
     class AsyncSocketServer : TcpSocketServerBase, IActiveConnector
@@ -38,7 +40,7 @@ namespace PangyaAPI.SuperSocket.Engine
                 }
                 catch (Exception e)
                 {
-                    //AppServer.Logger.Error("Failed to allocate buffer for async socket communication, may because there is no enough memory, please decrease maxConnectionNumber in configuration!", e);
+                    _smp.Message_Pool.push("Failed to allocate buffer for async socket communication, may because there is no enough memory, please decrease maxConnectionNumber in configuration!", e);
                     return false;
                 }
 
@@ -60,14 +62,13 @@ namespace PangyaAPI.SuperSocket.Engine
 
                 if (!base.Start())
                     return false;
-
                 IsRunning = true;
                 return true;
             }
             catch (Exception e)
             {
-               // AppServer.Logger.Error(e);
-                return false;
+                _smp.Message_Pool.push("[AsyncSocketServer::Start][LogException]: " + e.Message);
+                throw e;
             }
         }
 
@@ -86,9 +87,9 @@ namespace PangyaAPI.SuperSocket.Engine
             SocketAsyncEventArgsProxy socketEventArgsProxy;
             if (!m_ReadWritePool.TryPop(out socketEventArgsProxy))
             {
-                //AppServer.AsyncRun(client.SafeClose);
-                //if (AppServer.Logger.IsErrorEnabled)
-                //    AppServer.Logger.ErrorFormat("Max connection number {0} was reached!", AppServer.Config.MaxConnectionNumber);
+                client.SafeClose();
+                
+                _smp.Message_Pool.push(string.Format("Max connection number {0} was reached!", AppServer.Config.MaxConnectionNumber));
 
                 return null;
             }
@@ -103,13 +104,13 @@ namespace PangyaAPI.SuperSocket.Engine
             {
                 socketEventArgsProxy.Reset();
                 this.m_ReadWritePool.Push(socketEventArgsProxy);
-                //AppServer.AsyncRun(client.SafeClose);
+                client.SafeClose();
                 return null;
             }
 
             socketSession.Closed += SessionClosed;
 
-            var negotiateSession = socketSession as INegotiateSocketSession;
+            INegotiateSocketSession negotiateSession = socketSession as INegotiateSocketSession;
 
             if (negotiateSession == null)
             {
@@ -123,7 +124,6 @@ namespace PangyaAPI.SuperSocket.Engine
 
             negotiateSession.NegotiateCompleted += OnSocketSessionNegotiateCompleted;
             negotiateSession.Negotiate();
-
             return null;
         }
 
@@ -159,7 +159,7 @@ namespace PangyaAPI.SuperSocket.Engine
 
             var socketAsyncProxy = ((IAsyncSocketSessionBase)session.SocketSession).SocketAsyncProxy;
 
-            socketSession = new AsyncSocketSession(session.SocketSession.Client, socketAsyncProxy, true);
+            socketSession = new AsyncSocketSession(session.SocketSession.m_Socket, socketAsyncProxy, true);
 
             socketSession.Initialize(session);
             socketSession.Start();

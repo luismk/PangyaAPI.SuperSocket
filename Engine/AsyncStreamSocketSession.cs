@@ -164,7 +164,7 @@ namespace PangyaAPI.SuperSocket.SocketEngine
         private IAsyncResult BeginInitStream(AsyncCallback asyncCallback)
         {
             IAsyncResult result = null;
-            m_Stream = new NetworkStream(Client);
+            m_Stream = new NetworkStream(m_Socket);
             return result;
         }
 
@@ -287,14 +287,6 @@ namespace PangyaAPI.SuperSocket.SocketEngine
             }
 
             OnSendingCompleted(queue);
-        }
-
-        public override void ApplySecureProtocol()
-        {
-            var asyncResult = BeginInitStream(OnBeginInitStream);
-
-            if (asyncResult != null)
-                asyncResult.AsyncWaitHandle.WaitOne();
         }
 
         public SocketAsyncEventArgsProxy SocketAsyncProxy { get; private set; }

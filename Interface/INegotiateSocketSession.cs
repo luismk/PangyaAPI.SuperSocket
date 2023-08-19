@@ -2,12 +2,9 @@
 using System.IO;
 using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
-using PangyaAPI.SuperSocket.Engine;
 using PangyaAPI.SuperSocket.Interface;
-
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.Engine
 {
     /// <summary>
@@ -90,7 +87,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnReceiveTerminated(CloseReason.SocketError);
                 return;
             }
@@ -111,7 +108,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnReceiveTerminated(CloseReason.SocketError);
                 return;
             }
@@ -132,7 +129,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception ex)
             {
-                //LogError("Protocol error", ex);
+                _smp.Message_Pool.push("Protocol error", ex);
                 this.Close(CloseReason.ProtocolError);
                 return;
             }
@@ -150,7 +147,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception exc)
             {
-                //LogError(exc);
+                _smp.Message_Pool.push(exc);
                 OnReceiveTerminated(CloseReason.SocketError);
                 return;
             }
@@ -162,7 +159,7 @@ namespace PangyaAPI.SuperSocket.Engine
         {
             IAsyncResult result = null;
 
-            m_Stream = new NetworkStream(Client);
+            m_Stream = new NetworkStream(m_Socket);
 
 
             return result;
@@ -188,7 +185,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (IOException exc)
             {
-                //LogError(exc);
+                _smp.Message_Pool.push(exc);
 
                 if (!connect)//Session was already registered
                     this.Close(CloseReason.SocketError);
@@ -198,7 +195,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
 
                 if (!connect)//Session was already registered
                     this.Close(CloseReason.SocketError);
@@ -225,7 +222,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnSendError(queue, CloseReason.SocketError);
                 return;
             }
@@ -239,7 +236,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnSendError(queue, CloseReason.SocketError);
                 return;
             }
@@ -256,7 +253,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnSendError(queue, CloseReason.SocketError);
             }
         }
@@ -271,7 +268,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnSendError(queue, CloseReason.SocketError);
                 return;
             }
@@ -287,14 +284,6 @@ namespace PangyaAPI.SuperSocket.Engine
             }
 
             OnSendingCompleted(queue);
-        }
-
-        public override void ApplySecureProtocol()
-        {
-            var asyncResult = BeginInitStream(OnBeginInitStream);
-
-            if (asyncResult != null)
-                asyncResult.AsyncWaitHandle.WaitOne();
         }
 
         public SocketAsyncEventArgsProxy SocketAsyncProxy { get; private set; }
@@ -316,7 +305,7 @@ namespace PangyaAPI.SuperSocket.Engine
             }
             catch (Exception e)
             {
-               // //LogError(e);
+               _smp.Message_Pool.push(e);
                 OnNegotiateCompleted(false);
                 return;
             }

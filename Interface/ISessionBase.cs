@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 
 namespace PangyaAPI.SuperSocket.Interface
 {
-
     /// <summary>
     /// The basic session interface
     /// </summary>

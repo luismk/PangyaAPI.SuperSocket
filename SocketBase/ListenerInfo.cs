@@ -25,6 +25,12 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// The back log.
         /// </value>
         public int BackLog { get; set; }
-
+        public ListenerInfo()
+        { }
+        public ListenerInfo(int _BackLog, IPEndPoint Point)
+        {
+            BackLog = _BackLog;
+            EndPoint = Point;
+        }
     }
 }

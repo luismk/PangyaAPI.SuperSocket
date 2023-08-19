@@ -49,35 +49,9 @@ namespace PangyaAPI.SuperSocket.Interface
         /// <returns></returns>
         IAppSession GetSessionByID(uint sessionID);
 
-        //IAppSession GetSessionByUserName(string User);
+        IAppSession GetSessionByUserName(string User);
 
-        //IAppSession GetSessionByNick(string Nick);
-
-        //bool Start();
-
-        //bool Stop();
-        //bool Reset();
-
-        //// Logger Logger { get; set; }
-        // /// <summary>
-        // /// cria e lida com player
-        // /// </summary>
-        // /// <param name="client"> tcpclient</param>
-        // void HandleClient(object client);
-        // /// <summary>
-        // /// retorna a leitura do pacote
-        // /// </summary>
-        // /// <param name="client">client</param>
-        // /// <returns></returns>
-        // Packet HandleReceived(IAppSession client);
-        // void Send(IAppSession client, Packet packet);
-        // void SendToAll(Packet packet);
-        // void Send(IAppSession client, byte[] packet);
-        // void SendToAll(byte[] packet);
-
-        // void BroadMessage(string message);
-        // void TickerMessage(string message);
-        // void ServerMessage(string message);
+        IAppSession GetSessionByNick(string Nick);
 
         /// <summary>
         /// Gets the Receive filter factory.
@@ -163,7 +137,7 @@ namespace PangyaAPI.SuperSocket.Interface
         /// </summary>
         /// <param name="session">The session.</param>
         /// <param name="requestInfo">The request info.</param>
-        void ExecuteCommand(IAppSession session, TRequestInfo requestInfo);
+        void HandleRequest(IAppSession session, TRequestInfo requestInfo);
     }
 
     /// <summary>
@@ -180,20 +154,4 @@ namespace PangyaAPI.SuperSocket.Interface
         ISocketServer SocketServer { get; }
     }
 
-    /// <summary>
-    /// The basic interface for RemoteCertificateValidator
-    /// </summary>
-    public interface IRemoteCertificateValidator
-    {
-        /// <summary>
-        /// Validates the remote certificate
-        /// </summary>
-        /// <param name="session">The session.</param>
-        /// <param name="sender">The sender.</param>
-        /// <param name="certificate">The certificate.</param>
-        /// <param name="chain">The chain.</param>
-        /// <param name="sslPolicyErrors">The SSL policy errors.</param>
-        /// <returns></returns>
-        bool Validate(IAppSession session, object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors);
-    }
 }

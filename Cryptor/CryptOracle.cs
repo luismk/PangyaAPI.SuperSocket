@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PangyaAPI.SuperSocket.CRYPTS
+namespace PangyaAPI.SuperSocket.Cryptor
 {
     class KeyDictionary
     {

@@ -152,12 +152,6 @@ namespace PangyaAPI.SuperSocket.Interface
         /// The connection filter's name list, seperated by comma
         /// </value>
         string ConnectionFilter { get; }
-
-        /// <summary>
-        /// Gets the command loader, multiple values should be separated by comma.
-        /// </summary>
-        string CommandLoader { get; }
-
         /// <summary>
         /// Gets the start keep alive time, in seconds
         /// </summary>
@@ -196,13 +190,6 @@ namespace PangyaAPI.SuperSocket.Interface
         /// Gets the listeners' configuration.
         /// </summary>
         IEnumerable<IListenerConfig> Listeners { get; }
-
-        /// <summary>
-        /// Gets the log factory name.
-        /// </summary>
-        string LogFactory { get; }
-
-
         /// <summary>
         /// Gets the size of the sending queue.
         /// </summary>
@@ -210,24 +197,5 @@ namespace PangyaAPI.SuperSocket.Interface
         /// The size of the sending queue.
         /// </value>
         int SendingQueueSize { get; }
-
-
-
-        /// <summary>
-        /// Gets a value indicating whether [log basic session activity like connected and disconnected].
-        /// </summary>
-        /// <value>
-        /// 	<c>true</c> if [log basic session activity]; otherwise, <c>false</c>.
-        /// </value>
-        bool LogBasicSessionActivity { get; }
-
-
-        /// <summary>
-        /// Gets a value indicating whether [log all socket exception].
-        /// </summary>
-        /// <value>
-        /// <c>true</c> if [log all socket exception]; otherwise, <c>false</c>.
-        /// </value>
-        bool LogAllSocketException { get; }
     }
 }

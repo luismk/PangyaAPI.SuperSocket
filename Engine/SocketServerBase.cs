@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Threading.Tasks;
 using System;
-
+using _smp = PangyaAPI.Utilities.Log;
 namespace PangyaAPI.SuperSocket.Engine
 {
     abstract class SocketServerBase : ISocketServer, IDisposable
@@ -73,14 +73,14 @@ namespace PangyaAPI.SuperSocket.Engine
 
                     //if (log.IsDebugEnabled)
                     //{
-                    //    log.DebugFormat("Listener ({0}) was started", listener.EndPoint);
+                    _smp.Message_Pool.push(string.Format("Listener ({0}) was started", listener.EndPoint));
                     //}
                 }
                 else //If one listener failed to start, stop started listeners
                 {
                     //if (log.IsDebugEnabled)
                     //{
-                    //    log.DebugFormat("Listener ({0}) failed to start", listener.EndPoint);
+                    _smp.Message_Pool.push(string.Format("Listener ({0}) failed to start", listener.EndPoint));
                     //}
 
                     for (var j = 0; j < Listeners.Count; j++)
@@ -101,19 +101,14 @@ namespace PangyaAPI.SuperSocket.Engine
 
         void OnListenerError(ISocketListener listener, Exception e)
         {
-            //var logger = this.AppServer.Logger;
-
-            //if (!logger.IsErrorEnabled)
-            //    return;
-
-            //logger.Error(string.Format("Listener ({0}) error: {1}", listener.EndPoint, e.Message), e);
+            _smp.Message_Pool.push(string.Format("Listener ({0}) error: {1}", listener.EndPoint, e.Message), e);
         }
 
         void OnListenerStopped(object sender, EventArgs e)
         {
             var listener = sender as ISocketListener;
 
-            
+            _smp.Message_Pool.push(string.Format("Listener ({0}) was stoppped", listener.EndPoint));
         }
 
         protected abstract ISocketListener CreateListener(ListenerInfo listenerInfo);

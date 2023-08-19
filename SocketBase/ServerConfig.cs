@@ -70,7 +70,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// </summary>
         public ServerConfig()
         {
-            Security = "None";
             MaxConnectionNumber = DefaultMaxConnectionNumber;
             Mode = SocketMode.Tcp;
             MaxRequestLength = DefaultMaxRequestLength;
@@ -79,6 +78,10 @@ namespace PangyaAPI.SuperSocket.SocketBase
             ListenBacklog = 100;
             ReceiveBufferSize = DefaultReceiveBufferSize;
             SendingQueueSize = DefaultSendingQueueSize;
+            ClearIdleSession = true;
+            IdleSessionTimeOut = 300;//seconds
+            ClearIdleSessionInterval = 120;//seconds
+            SessionSnapshotInterval = 5;//seconds
         }
 
         #region IServerConfig Members
@@ -179,14 +182,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         public bool SyncSend { get; set; }
 
         /// <summary>
-        /// Gets/sets a value indicating whether log command in log file.
-        /// </summary>
-        /// <value>
-        ///   <c>true</c> if log command; otherwise, <c>false</c>.
-        /// </value>
-        public bool LogCommand { get; set; }
-
-        /// <summary>
         /// Gets/sets a value indicating whether clear idle session.
         /// </summary>
         /// <value>
@@ -209,11 +204,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// The idle session time out.
         /// </value>
         public int IdleSessionTimeOut { get; set; }
-
-        /// <summary>
-        /// Gets/sets the security protocol, X509 certificate.
-        /// </summary>
-        public string Security { get; set; }
 
         /// <summary>
         /// Gets/sets the length of the max request.
@@ -243,11 +233,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// The connection filter's name list, seperated by comma
         /// </value>
         public string ConnectionFilter { get; set; }
-
-        /// <summary>
-        /// Gets the command loader, multiple values should be separated by comma.
-        /// </summary>
-        public string CommandLoader { get; set; }
 
         /// <summary>
         /// Gets/sets the start keep alive time, in seconds
@@ -285,12 +270,7 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// Gets and sets the listeners' configuration.
         /// </summary>
         public IEnumerable<IListenerConfig> Listeners { get; set; }
-
-        /// <summary>
-        /// Gets/sets the log factory name.
-        /// </summary>
-        public string LogFactory { get; set; }
-
+         
         /// <summary>
         /// Gets/sets the size of the sending queue.
         /// </summary>
@@ -298,22 +278,6 @@ namespace PangyaAPI.SuperSocket.SocketBase
         /// The size of the sending queue.
         /// </value>
         public int SendingQueueSize { get; set; }
-
-        /// <summary>
-        /// Gets a value indicating whether [log basic session activity like connected and disconnected].
-        /// </summary>
-        /// <value>
-        /// 	<c>true</c> if [log basic session activity]; otherwise, <c>false</c>.
-        /// </value>
-        public bool LogBasicSessionActivity { get; set; }
-
-        /// <summary>
-        /// Gets/sets a value indicating whether [log all socket exception].
-        /// </summary>
-        /// <value>
-        /// <c>true</c> if [log all socket exception]; otherwise, <c>false</c>.
-        /// </value>
-        public bool LogAllSocketException { get; set; }
 
         #endregion
     }
